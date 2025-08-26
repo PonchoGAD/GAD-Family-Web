@@ -1,0 +1,4 @@
+﻿@import "tailwindcss";
+
+/* твои любые глобальные стили ниже */
+html, body { margin: 0; padding: 0; }
