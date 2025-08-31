@@ -352,15 +352,18 @@ function Metric({ label, value }: { label: string; value: string | number }): Re
 }
 
 function Tokenomics(): ReactElement {
-  const total = CONFIG.tokenomics.reduce((s, i) => s + i.value, 0);
+  const data = CONFIG.tokenomics;
+  const total = data.reduce((s, i) => s + i.value, 0);
+
   return (
     <section id="tokenomics" className="py-14">
       <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-center">
+        {/* левая колонка */}
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold">Tokenomics</h2>
-          <p className="mt-3 text-white/80">Initial distribution. Adjust as the model evolves.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold">Токеномика</h2>
+          <p className="mt-3 text-white/80">Базовое распределение. Значения можно обновить по мере уточнения модели.</p>
           <ul className="mt-4 space-y-2">
-            {CONFIG.tokenomics.map((t, idx) => (
+            {data.map((t, idx) => (
               <li key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-block w-3 h-3 rounded-sm" style={{ background: COLORS[idx % COLORS.length] }} />
@@ -370,17 +373,30 @@ function Tokenomics(): ReactElement {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-white/60">Sum: {total}% • Total Supply: 10,000,000,000,000 GAD</p>
+          <p className="mt-3 text-xs text-white/60">Сумма: {total}% • Total Supply: 10,000,000,000,000 GAD</p>
         </div>
-        <div className="h-72 bg-white/5 border border-white/10 rounded-2xl p-4">
+
+        {/* правая колонка */}
+        <div className="h-80 bg-white/5 border border-white/10 rounded-2xl p-4">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={CONFIG.tokenomics} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2}>
-                {CONFIG.tokenomics.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+            <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={60}
+                outerRadius={110}
+                paddingAngle={2}
+                labelLine={false}
+                label={({ percent }) => `${Math.round(percent * 100)}%`}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip contentStyle={{ background: '#111827', border: '1px solid #374151', borderRadius: 12, color: 'white' }} />
+              <Tooltip
+                contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, color: "white" }}
+              />
               <Legend />
             </PieChart>
           </ResponsiveContainer>
