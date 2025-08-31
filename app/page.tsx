@@ -8,14 +8,17 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 
 const CONTRACT_ADDRESS = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const BSCSCAN_URL = 'https://bscscan.com/address/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
-const PANCAKE_URL = 'https://pancakeswap.finance/swap?outputCurrency=0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
+const PANCAKE_URL =
+  'https://pancakeswap.finance/swap?inputCurrency=0x55d398326f99059fF775485246999027B3197955&outputCurrency=0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 
 const CONFIG = {
   brand: {
     name: 'GAD Family',
     token: 'GAD',
     tagline: 'Safer Families. Smarter Money.',
-    logoUrl: '/assets/logo-64.png',
+    // не обязательно: если файлов пока нет, оставь пустым — будет фолбэк
+    logoUrl: '',             // например: '/assets/logo-64.png'
+    heroUrl: '',             // например: '/assets/hero-family.png'
   },
   contract: {
     address: CONTRACT_ADDRESS,
@@ -25,23 +28,46 @@ const CONFIG = {
   },
   links: {
     buyUrl: PANCAKE_URL,
-    liquidityUrl: 'https://pancakeswap.finance/liquidity?chain=bsc&persistChain=1',
+    // публичная пара (V2)
+    liquidityUrl:
+      'https://pancakeswap.finance/v2/pair/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc&persistChain=1',
     bscscanUrl: BSCSCAN_URL,
     githubUrl: '#',
     appUrl: '#',
+    // ЗАМЕНИ: embed-URL своей Google формы
+    investForm: 'https://docs.google.com/forms/d/e/FORM_ID/viewform?embedded=true',
+    // ЗАМЕНИ: адрес вашего multisig (Safe) в сети BSC
+    investWallet: '0xYOUR_MULTISIG_ON_BSC',
   },
+  // Новая токеномика (сумма 100%)
   tokenomics: [
-    { name: 'Circulating @Launch', value: 50 },
-    { name: 'Ecosystem & Treasury (vesting)', value: 20 },
-    { name: 'Community Rewards (walk-to-earn)', value: 15 },
-    { name: 'Liquidity (locked)', value: 10 },
-    { name: 'Team (24m vest)', value: 5 },
+    { name: 'Launchpad (public sale)', value: 30 },
+    {
+      name: 'Long-term Lock (36m, unlock each 6m; burn 10% of each unlocked tranche)',
+      value: 50,
+    },
+    { name: 'Early Investors (vesting)', value: 10 },
+    { name: 'Founder & Development', value: 10 },
   ],
   metrics: { holders: 0, tvlUSD: 0, liquidityLockedUntil: 'TBD' },
+  // Обновлённый roadmap
   roadmap: [
-    { title: 'Q3 2025', items: ['Public website & waitlist', 'DEX listing: GAD/BNB, lock LP', 'Investor landing MVP'] },
-    { title: 'Q4 2025', items: ['iOS/Android MVP: steps→rewards, family wallet', 'Metrics dashboard', 'GAD/USDT pool, basic staking'] },
-    { title: 'Q1 2026', items: ['Buyback + LP from app revenue', 'Partnership pilots', 'Prep for CEX'] },
+    {
+      title: 'Q3 2025',
+      items: ['Token & website live', 'PancakeSwap V2 LP + LP lock', 'App development in progress'],
+    },
+    {
+      title: 'Q4 2025',
+      items: [
+        'App beta (closed tests, QA & telemetry)',
+        'Fundraising for launch (USDT on BSC, whitelist)',
+        'Public communications & partnerships',
+      ],
+    },
+    {
+      title: 'Q1 2026',
+      items: ['Full project launch (public app release)', 'Marketing scale-up & listings', 'Staking/quests post-launch'],
+    },
   ],
 };
 
@@ -53,6 +79,7 @@ export default function Page(): ReactElement {
       <Header />
       <Hero />
       <ValueProps />
+      <Invest />
       <TokenSection />
       <Tokenomics />
       <Roadmap />
@@ -62,21 +89,49 @@ export default function Page(): ReactElement {
 }
 
 function Header(): ReactElement {
+  const hasLogo = Boolean((CONFIG as any)?.brand?.logoUrl);
+
   return (
     <header className="sticky top-0 z-30 backdrop-blur bg-black/30 border-b border-white/10">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Image src={CONFIG.brand.logoUrl} alt="GAD coin logo" width={36} height={36} className="rounded-full shadow" />
+          {hasLogo ? (
+            <Image
+              src={CONFIG.brand.logoUrl}
+              alt={`${CONFIG.brand.name} logo`}
+              width={36}
+              height={36}
+              className="rounded-full shadow"
+              priority
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-[#ffd166] text-[#0b0f17] font-extrabold grid place-items-center shadow">G</div>
+          )}
           <span className="font-bold tracking-wide">{CONFIG.brand.name}</span>
         </div>
+
         <nav className="hidden md:flex items-center gap-5 text-sm opacity-90">
           <a href="#token" className="hover:opacity-100">Token</a>
           <a href="#tokenomics" className="hover:opacity-100">Tokenomics</a>
           <a href="#roadmap" className="hover:opacity-100">Roadmap</a>
-          <a href={CONFIG.links.bscscanUrl} target="_blank" className="hover:opacity-100 flex items-center gap-1">BscScan <ExternalLink className="w-4 h-4" /></a>
+          <a href="#invest" className="hover:opacity-100">Invest</a>
+          <a
+            href={CONFIG.links.bscscanUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="hover:opacity-100 flex items-center gap-1"
+          >
+            BscScan <ExternalLink className="w-4 h-4" />
+          </a>
         </nav>
+
         <div className="flex items-center gap-2">
-          <a href={CONFIG.links.buyUrl} target="_blank" className="px-3 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:scale-[1.02] transition">
+          <a
+            href={CONFIG.links.buyUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="px-3 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:scale-[1.02] transition"
+          >
             Buy on PancakeSwap
           </a>
         </div>
@@ -86,6 +141,8 @@ function Header(): ReactElement {
 }
 
 function Hero(): ReactElement {
+  const hasHero = Boolean((CONFIG as any)?.brand?.heroUrl);
+
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#1e2746,transparent_60%)] pointer-events-none" />
@@ -101,26 +158,43 @@ function Hero(): ReactElement {
           Contract: <span className="font-mono bg-white/10 px-2 py-1 rounded">{CONFIG.contract.address}</span>
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <a href={CONFIG.links.buyUrl} target="_blank" className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2">
+          <a
+            href={CONFIG.links.buyUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2"
+          >
             <Wallet className="w-5 h-5" /> Buy GAD
           </a>
-          <a href={CONFIG.links.liquidityUrl} target="_blank" className="px-5 py-3 rounded-2xl border border-white/20 hover:border-white/40 transition flex items-center gap-2">
+          <a
+            href={CONFIG.links.liquidityUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="px-5 py-3 rounded-2xl border border-white/20 hover:border-white/40 transition flex items-center gap-2"
+          >
             <Lock className="w-5 h-5" /> Add Liquidity
           </a>
         </div>
+
         <div className="relative max-w-5xl mx-auto mt-6 px-4">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <span className="font-extrabold text-[56px] md:text-[80px] tracking-[0.3em] text-white/5 select-none">GAD FAMILY</span>
           </div>
-          <Image
-            src="/assets/hero-family.png"
-            alt="Family using the GAD Family app"
-            width={1600}
-            height={900}
-            className="relative rounded-2xl w-full h-auto shadow-xl"
-            priority
-          />
+
+          {hasHero ? (
+            <Image
+              src={CONFIG.brand.heroUrl}
+              alt="Family using the GAD Family app"
+              width={1600}
+              height={900}
+              className="relative rounded-2xl w-full h-auto shadow-xl"
+              priority
+            />
+          ) : (
+            <div className="relative rounded-2xl w-full aspect-[16/9] shadow-xl bg-gradient-to-br from-[#1e2746] via-[#0b0f17] to-[#1e2746] border border-white/10" />
+          )}
         </div>
+
         <p className="text-center mt-3 opacity-90"><strong>App for Family Safety</strong></p>
         <div className="mt-4 text-sm text-white/70">
           Network: {CONFIG.contract.chainName} • Decimals: {CONFIG.contract.decimals}
@@ -151,6 +225,77 @@ function ValueProps(): ReactElement {
   );
 }
 
+function Invest(): React.ReactElement {
+  const [copied, setCopied] = React.useState(false);
+  const addr = CONFIG.links.investWallet;
+
+  return (
+    <section id="invest" className="py-14">
+      <div className="max-w-6xl mx-auto px-4 grid lg:grid-cols-2 gap-8 items-start">
+        {/* Terms / Address */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <h2 className="text-2xl md:text-3xl font-extrabold">Raise & Terms</h2>
+          <ul className="mt-4 space-y-2 text-white/85">
+            <li>Target raise: <b>$250,000</b> in <b>USDT (BEP-20)</b>.</li>
+            <li>Presale rate: <b>10,000 GAD / 1 USDT</b>. Listing rate: <b>9,500 GAD / 1 USDT</b>.</li>
+            <li>60% of raise to LP on PancakeSwap V2; LP locked 12 months. 40% to treasury (multisig).</li>
+            <li>Vesting (early investors): TGE 20%, 1-month cliff, linear 6–12 months.</li>
+            <li>Unsold from launchpad: burn or long-term lock (publicly verifiable).</li>
+            <li>Token locks: <b>50% total supply locked for 36 months</b>, unlock every 6 months; <b>burn 10% of each unlocked tranche</b>, 90% → treasury/operations.</li>
+            <li>Distribution: 30% Launchpad, 50% Long-term lock, 10% Early Investors, 10% Founder & Development.</li>
+            <li>Funds custody: BSC multisig (Safe). Address below.</li>
+          </ul>
+
+          <div className="mt-5 p-4 bg-black/30 rounded-xl border border-white/10">
+            <div className="text-sm text-white/70">Investment wallet (USDT, BEP-20):</div>
+            <div className="mt-1 font-mono break-all select-all">{addr}</div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(addr); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+              className="mt-3 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+            >
+              {copied ? 'Copied' : 'Copy address'}
+            </button>
+          </div>
+
+          <div className="mt-5 text-xs text-white/60">
+            Disclaimer: This is not investment advice and not an offer of securities. Tokens provide utility in the GAD Family app. Crypto assets are high risk; only commit what you can afford to lose.
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <a
+              href={CONFIG.links.liquidityUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" /> Pancake LP
+            </a>
+            <a
+              href={CONFIG.links.buyUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-bold"
+            >
+              Buy on Pancake
+            </a>
+          </div>
+        </div>
+
+        {/* Google Form */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+          <div className="px-6 pt-6">
+            <h3 className="font-bold">Apply / Register interest</h3>
+            <p className="text-white/70 text-sm">Fill the form — we will contact you.</p>
+          </div>
+          <div className="aspect-[3/4] w-full">
+            <iframe src={CONFIG.links.investForm} className="w-full h-full border-0" loading="lazy" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function TokenSection(): ReactElement {
   return (
     <section id="token" className="py-12 md:py-16 bg-black/20 border-y border-white/10">
@@ -164,11 +309,26 @@ function TokenSection(): ReactElement {
             <li className="flex gap-2"><Coins className="w-5 h-5 text-[#ffd166] mt-1" /> Pairs: GAD/BNB → GAD/USDT</li>
           </ul>
           <div className="mt-5 flex flex-wrap gap-3">
-            <a href={CONFIG.links.bscscanUrl} target="_blank" className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 flex items-center gap-2"><ExternalLink className="w-4 h-4" /> BscScan</a>
-            <a href={CONFIG.links.githubUrl} target="_blank" className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 flex items-center gap-2"><Github className="w-4 h-4" /> GitHub</a>
-            <a href={CONFIG.links.appUrl} className="px-4 py-2 rounded-xl bg:white/10 hover:bg-white/15">Open App</a>
+            <a
+              href={CONFIG.links.bscscanUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 flex items-center gap-2"
+            >
+              <ExternalLink className="w-4 h-4" /> BscScan
+            </a>
+            <a
+              href={CONFIG.links.githubUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 flex items-center gap-2"
+            >
+              <Github className="w-4 h-4" /> GitHub
+            </a>
+            <a href={CONFIG.links.appUrl} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">Open App</a>
           </div>
         </div>
+
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <h3 className="font-bold">Live Metrics</h3>
           <div className="mt-4 grid grid-cols-3 gap-4 text-center">
@@ -237,7 +397,7 @@ function Roadmap(): ReactElement {
         <h2 className="text-2xl md:text-3xl font-extrabold">Roadmap</h2>
         <div className="mt-6 grid md:grid-cols-3 gap-6">
           {CONFIG.roadmap.map((col, i) => (
-            <div key={i} className="bg:white/5 border border-white/10 rounded-2xl p-5">
+            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
               <h3 className="font-bold text-lg">{col.title}</h3>
               <ul className="mt-3 space-y-2 list-disc list-inside text-white/85">
                 {col.items.map((it, idx) => <li key={idx}>{it}</li>)}
