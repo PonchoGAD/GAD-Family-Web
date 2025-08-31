@@ -4,7 +4,7 @@ import React from 'react';
 import type { ReactElement } from 'react';
 import Image from 'next/image';
 import { Rocket, Shield, Coins, Users, LineChart, ExternalLink, Lock, Wallet, Github } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 
 const CONTRACT_ADDRESS = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const BSCSCAN_URL = 'https://bscscan.com/address/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
@@ -351,60 +351,117 @@ function Metric({ label, value }: { label: string; value: string | number }): Re
   );
 }
 
+function CustomTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  const { name, value } = payload[0];
+  return (
+    <div
+      style={{
+        background: "#0b0f17",
+        border: "1px solid #334155",
+        borderRadius: 12,
+        padding: "8px 10px",
+        color: "#fff",
+        boxShadow: "0 8px 24px rgba(0,0,0,.45)",
+        maxWidth: 260,
+      }}
+    >
+      <div style={{ opacity: 0.85, fontSize: 12, lineHeight: "16px" }}>{name}</div>
+      <div style={{ fontWeight: 800 }}>{value}%</div>
+    </div>
+  );
+}
+
+function CustomLegend({ data }: { data: { name: string; value: number }[] }) {
+  return (
+    <ul className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {data.map((t, idx) => (
+        <li key={idx} className="flex items-start gap-2 text-sm leading-snug break-words">
+          <span
+            className="mt-1 inline-block w-3 h-3 rounded-sm flex-shrink-0"
+            style={{ background: COLORS[idx % COLORS.length] }}
+          />
+          <span className="flex-1 min-w-0">{t.name}</span>
+          <span className="font-bold ml-2 flex-shrink-0">{t.value}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function Tokenomics(): ReactElement {
   const data = CONFIG.tokenomics;
   const total = data.reduce((s, i) => s + i.value, 0);
 
   return (
     <section id="tokenomics" className="py-14">
-      <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-center">
-        {/* левая колонка */}
+      <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-start">
+        {/* Left column */}
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold">Токеномика</h2>
-          <p className="mt-3 text-white/80">Базовое распределение. Значения можно обновить по мере уточнения модели.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold">Tokenomics</h2>
+          <p className="mt-3 text-white/80">
+            Base allocation. Values may be updated as we refine the model.
+          </p>
           <ul className="mt-4 space-y-2">
             {data.map((t, idx) => (
-              <li key={idx} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3">
+              <li
+                key={idx}
+                className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3"
+              >
                 <div className="flex items-center gap-2">
-                  <span className="inline-block w-3 h-3 rounded-sm" style={{ background: COLORS[idx % COLORS.length] }} />
+                  <span
+                    className="inline-block w-3 h-3 rounded-sm"
+                    style={{ background: COLORS[idx % COLORS.length] }}
+                  />
                   <span>{t.name}</span>
                 </div>
                 <span className="font-bold">{t.value}%</span>
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-white/60">Сумма: {total}% • Total Supply: 10,000,000,000,000 GAD</p>
+          <p className="mt-3 text-xs text-white/60">
+            Total: {total}% • Total Supply: 10,000,000,000,000 GAD
+          </p>
         </div>
 
-        {/* правая колонка */}
-        <div className="h-80 bg-white/5 border border-white/10 rounded-2xl p-4">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={60}
-                outerRadius={110}
-                paddingAngle={2}
-                labelLine={false}
-                label={({ percent }) => `${Math.round(percent * 100)}%`}
-              >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 12, color: "white" }}
-              />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+        {/* Right column: chart + our legend */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div className="h-96 md:h-[28rem]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <Pie
+                  data={data}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={70}
+                  outerRadius={115}
+                  paddingAngle={2}
+                  labelLine={false}
+                  label={({ percent }) => `${Math.round(percent * 100)}%`}
+                >
+                  {data.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+
+                {/* Tooltip fixed to top-right so it never covers the legend */}
+                <Tooltip
+                  content={<CustomTooltip />}
+                  position={{ x: undefined, y: 12 }} // pin to top; x auto near cursor
+                  wrapperStyle={{ pointerEvents: "none" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Our legend below the chart (no overlap with the doughnut) */}
+          <CustomLegend data={data} />
         </div>
       </div>
     </section>
   );
 }
+
 
 function Roadmap(): ReactElement {
   return (
