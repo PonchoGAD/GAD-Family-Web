@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import type { ReactElement } from 'react';
@@ -19,7 +19,7 @@ const CONFIG = {
     name: 'GAD Family',
     token: 'GAD',
     tagline: 'Safer Families. Smarter Money.',
-    logoUrl: "/logo-32.png",
+    logoUrl: "/logo.png",
     heroUrl: "/images/hero-family.png",
   },
   contract: {
@@ -35,7 +35,7 @@ const CONFIG = {
     bscscanUrl: BSCSCAN_URL,
     githubUrl: '#',
     appUrl: '#',
-    // С‚РІРѕСЏ С„РѕСЂРјР° (РјРѕР¶РЅРѕ Р·Р°РјРµРЅРёС‚СЊ РЅР° ?usp=sf_link вЂ” С‚РѕР¶Рµ РѕРє)
+    
     investForm: 'https://docs.google.com/forms/d/e/1FAIpQLScnYggks4ikZA3buSLazXkZiWhrQz6WT50aukkHQIFI3rUp9g/viewform?usp=sharing&ouid=111082380689727787961',
     investWallet: '0x4C0B07Ad19D47994639D18ac2Af2FF82A0F95F37',
   },
@@ -62,7 +62,7 @@ export default function Page(): ReactElement {
       <Header />
       <Hero />
       <ValueProps />
-      {/* РїРѕРєР°Р·С‹РІР°РµРј СЃРµРєС†РёСЋ СЃРѕ СЃСЂРѕРєР°РјРё Рё РєРЅРѕРїРєРѕР№ РїРµСЂРµС…РѕРґР° РЅР° Google Form */}
+      {/* Google Form */}
       <Invest />
       <TokenSection />
       <Tokenomics />
@@ -135,7 +135,7 @@ function Hero(): ReactElement {
           <Coins className="w-10 h-10 text-[#ffd166]" />
         </div>
         <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight">
-          {CONFIG.brand.name} вЂ” {CONFIG.brand.tagline}
+          {CONFIG.brand.name} — {CONFIG.brand.tagline}
         </h1>
         <p className="mt-4 text-white/80 max-w-3xl mx-auto">
           {CONFIG.brand.token} is a real-utility token powering family safety, healthy habits, and a simple shared wallet.
@@ -181,7 +181,7 @@ function Hero(): ReactElement {
 
         <p className="text-center mt-3 opacity-90"><strong>App for Family Safety</strong></p>
         <div className="mt-4 text-sm text-white/70">
-          Network: {CONFIG.contract.chainName} вЂў Decimals: {CONFIG.contract.decimals}
+          Network: {CONFIG.contract.chainName} • Decimals: {CONFIG.contract.decimals}
         </div>
       </div>
     </section>
@@ -191,7 +191,7 @@ function Hero(): ReactElement {
 function ValueProps(): ReactElement {
   const items = [
     { icon: <Shield className="w-6 h-6 text-[#ffd166]" />, title: 'Transparency', text: 'Verified contract, public addresses, locked LP.' },
-    { icon: <Users className="w-6 h-6 text-[#ffd166]" />, title: 'Family-first', text: 'Private circles, stepsв†’rewards, shared wallet, AI safety assistant.' },
+    { icon: <Users className="w-6 h-6 text-[#ffd166]" />, title: 'Family-first', text: 'Private circles, steps→rewards, shared wallet, AI safety assistant.' },
     { icon: <LineChart className="w-6 h-6 text-[#ffd166]" />, title: 'Real revenue', text: 'Part of app revenue goes to buyback & LP.' },
   ];
   return (
@@ -223,9 +223,9 @@ function Invest(): React.ReactElement {
             <li>Target raise: <b>$250,000</b> in <b>USDT (BEP-20)</b>.</li>
             <li>Presale rate: <b>10,000 GAD / 1 USDT</b>. Listing rate: <b>9,500 GAD / 1 USDT</b>.</li>
             <li>60% of raise to LP on PancakeSwap V2; LP locked 12 months. 40% to treasury (multisig).</li>
-            <li>Vesting (early investors): TGE 20%, 1-month cliff, linear 6вЂ“12 months.</li>
+            <li>Vesting (early investors): TGE 20%, 1-month cliff, linear 6–12 months.</li>
             <li>Unsold from launchpad: burn or long-term lock (publicly verifiable).</li>
-            <li>Token locks: <b>50% total supply locked for 36 months</b>, unlock every 6 months; <b>burn 10% of each unlocked tranche</b>, 90% в†’ treasury/operations.</li>
+            <li>Token locks: <b>50% total supply locked for 36 months</b>, unlock every 6 months; <b>burn 10% of each unlocked tranche</b>, 90% → treasury/operations.</li>
             <li>Distribution: 30% Launchpad, 50% Long-term lock, 10% Early Investors, 10% Founder & Development.</li>
             <li>Funds custody: BSC multisig (Safe). Address below.</li>
           </ul>
@@ -265,11 +265,11 @@ function Invest(): React.ReactElement {
           </div>
         </div>
 
-        {/* Google Form: РєРЅРѕРїРєР° -> РѕС‚РєСЂС‹РІР°РµС‚ С„РѕСЂРјСѓ РІ РЅРѕРІРѕР№ РІРєР»Р°РґРєРµ */}
+        {/* Google Form */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 pt-6 text-center">
             <h3 className="font-bold">Apply / Register interest</h3>
-            <p className="text-white/70 text-sm mb-4">Fill the form вЂ” we will contact you.</p>
+            <p className="text-white/70 text-sm mb-4">Fill the form — we will contact you.</p>
             <a
               href={CONFIG.links.investForm}
               target="_blank"
@@ -295,7 +295,7 @@ function TokenSection(): ReactElement {
             <li className="flex gap-2"><Rocket className="w-5 h-5 text-[#ffd166] mt-1" /> Fixed supply: 10,000,000,000,000 GAD</li>
             <li className="flex gap-2"><Shield className="w-5 h-5 text-[#ffd166] mt-1" /> Burn available to all holders</li>
             <li className="flex gap-2"><Lock className="w-5 h-5 text-[#ffd166] mt-1" /> LP will be locked (link soon)</li>
-            <li className="flex gap-2"><Coins className="w-5 h-5 text-[#ffd166] mt-1" /> Pairs: GAD/BNB в†’ GAD/USDT</li>
+            <li className="flex gap-2"><Coins className="w-5 h-5 text-[#ffd166] mt-1" /> Pairs: GAD/BNB → GAD/USDT</li>
           </ul>
           <div className="mt-5 flex flex-wrap gap-3">
             <a
@@ -408,7 +408,7 @@ function Tokenomics(): ReactElement {
             ))}
           </ul>
           <p className="mt-3 text-xs text-white/60">
-            Total: {total}% вЂў Total Supply: 10,000,000,000,000 GAD
+            Total: {total}% • Total Supply: 10,000,000,000,000 GAD
           </p>
         </div>
 
@@ -465,7 +465,7 @@ function Footer(): ReactElement {
   return (
     <footer className="py-8 text-white/70">
       <div className="max-w-6xl mx-auto px-4">
-        В© {new Date().getFullYear()} GAD Family вЂў Built for real families
+        © {new Date().getFullYear()} GAD Family • Built for real families
       </div>
     </footer>
   );
