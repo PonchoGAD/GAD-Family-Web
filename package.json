@@ -9,6 +9,7 @@
     "lint": "echo \"(no linter configured)\""
   },
   "dependencies": {
+    "@vercel/analytics": "^1.5.0",
     "lucide-react": "^0.542.0",
     "next": "^15.5.0",
     "react": "^18.3.1",

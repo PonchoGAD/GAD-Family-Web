@@ -5,6 +5,9 @@ import type { ReactElement } from 'react';
 import Image from 'next/image';
 import { Rocket, Shield, Coins, Users, LineChart, ExternalLink, Lock, Wallet, Github } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import InvestForm from "../app/components/InvestForm";
+import { Analytics } from "@vercel/analytics/react"
+import InvestButton from "../app/components/InvestButton";
 
 const CONTRACT_ADDRESS = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const BSCSCAN_URL = 'https://bscscan.com/address/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
@@ -16,9 +19,8 @@ const CONFIG = {
     name: 'GAD Family',
     token: 'GAD',
     tagline: 'Safer Families. Smarter Money.',
-    // не обязательно: если файлов пока нет, оставь пустым — будет фолбэк
-    logoUrl: '',             // например: '/assets/logo-64.png'
-    heroUrl: '',             // например: '/assets/hero-family.png'
+    logoUrl: './app/public/logo-32.png',
+    heroUrl: './app/icon-32-fixed_files/hero-family.png',
   },
   contract: {
     address: CONTRACT_ADDRESS,
@@ -28,46 +30,27 @@ const CONFIG = {
   },
   links: {
     buyUrl: PANCAKE_URL,
-    // публичная пара (V2)
     liquidityUrl:
       'https://pancakeswap.finance/v2/pair/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc&persistChain=1',
     bscscanUrl: BSCSCAN_URL,
     githubUrl: '#',
     appUrl: '#',
-    // ЗАМЕНИ: embed-URL своей Google формы
-    investForm: 'https://docs.google.com/forms/d/e/FORM_ID/viewform?embedded=true',
-    // ЗАМЕНИ: адрес вашего multisig (Safe) в сети BSC
-    investWallet: '0xYOUR_MULTISIG_ON_BSC',
+    // твоя форма (можно заменить на ?usp=sf_link — тоже ок)
+    investForm: 'https://docs.google.com/forms/d/e/1FAIpQLScnYggks4ikZA3buSLazXkZiWhrQz6WT50aukkHQIFI3rUp9g/viewform?usp=sharing&ouid=111082380689727787961',
+    investWallet: '0x4C0B07Ad19D47994639D18ac2Af2FF82A0F95F37',
   },
-  // Новая токеномика (сумма 100%)
+
   tokenomics: [
     { name: 'Launchpad (public sale)', value: 30 },
-    {
-      name: 'Long-term Lock (36m, unlock each 6m; burn 10% of each unlocked tranche)',
-      value: 50,
-    },
+    { name: 'Long-term Lock (36m, unlock each 6m; burn 10% of each unlocked tranche)', value: 50 },
     { name: 'Early Investors (vesting)', value: 10 },
     { name: 'Founder & Development', value: 10 },
   ],
   metrics: { holders: 0, tvlUSD: 0, liquidityLockedUntil: 'TBD' },
-  // Обновлённый roadmap
   roadmap: [
-    {
-      title: 'Q3 2025',
-      items: ['Token & website live', 'PancakeSwap V2 LP + LP lock', 'App development in progress'],
-    },
-    {
-      title: 'Q4 2025',
-      items: [
-        'App beta (closed tests, QA & telemetry)',
-        'Fundraising for launch (USDT on BSC, whitelist)',
-        'Public communications & partnerships',
-      ],
-    },
-    {
-      title: 'Q1 2026',
-      items: ['Full project launch (public app release)', 'Marketing scale-up & listings', 'Staking/quests post-launch'],
-    },
+    { title: 'Q3 2025', items: ['Token & website live', 'PancakeSwap V2 LP + LP lock', 'App development in progress'] },
+    { title: 'Q4 2025', items: ['App beta (closed tests, QA & telemetry)', 'Fundraising for launch (USDT on BSC, whitelist)', 'Public communications & partnerships'] },
+    { title: 'Q1 2026', items: ['Full project launch (public app release)', 'Marketing scale-up & listings', 'Staking/quests post-launch'] },
   ],
 };
 
@@ -79,6 +62,7 @@ export default function Page(): ReactElement {
       <Header />
       <Hero />
       <ValueProps />
+      {/* показываем секцию со сроками и кнопкой перехода на Google Form */}
       <Invest />
       <TokenSection />
       <Tokenomics />
@@ -251,7 +235,7 @@ function Invest(): React.ReactElement {
             <div className="mt-1 font-mono break-all select-all">{addr}</div>
             <button
               onClick={() => { navigator.clipboard.writeText(addr); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-              className="mt-3 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-sm"
+              className="mt-3 px-3 py-2 rounded-xl bg:white/10 hover:bg-white/15 text-sm"
             >
               {copied ? 'Copied' : 'Copy address'}
             </button>
@@ -281,14 +265,19 @@ function Invest(): React.ReactElement {
           </div>
         </div>
 
-        {/* Google Form */}
+        {/* Google Form: кнопка -> открывает форму в новой вкладке */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="px-6 pt-6">
+          <div className="px-6 pt-6 text-center">
             <h3 className="font-bold">Apply / Register interest</h3>
-            <p className="text-white/70 text-sm">Fill the form — we will contact you.</p>
-          </div>
-          <div className="aspect-[3/4] w-full">
-            <iframe src={CONFIG.links.investForm} className="w-full h-full border-0" loading="lazy" />
+            <p className="text-white/70 text-sm mb-4">Fill the form — we will contact you.</p>
+            <a
+              href={CONFIG.links.investForm}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 rounded-xl bg-black text-white hover:opacity-90"
+            >
+              Open Investment Form
+            </a>
           </div>
         </div>
       </div>
@@ -301,8 +290,8 @@ function TokenSection(): ReactElement {
     <section id="token" className="py-12 md:py-16 bg-black/20 border-y border-white/10">
       <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-center">
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold">GAD Token on BSC</h2>
-          <ul className="mt-4 space-y-3 text-white/85">
+          <h2 className="text-2xl md:3xl font-extrabold">GAD Token on BSC</h2>
+          <ul className="mt-4 space-y-3 text:white/85">
             <li className="flex gap-2"><Rocket className="w-5 h-5 text-[#ffd166] mt-1" /> Fixed supply: 10,000,000,000,000 GAD</li>
             <li className="flex gap-2"><Shield className="w-5 h-5 text-[#ffd166] mt-1" /> Burn available to all holders</li>
             <li className="flex gap-2"><Lock className="w-5 h-5 text-[#ffd166] mt-1" /> LP will be locked (link soon)</li>
@@ -396,7 +385,6 @@ function Tokenomics(): ReactElement {
   return (
     <section id="tokenomics" className="py-14">
       <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-8 items-start">
-        {/* Left column */}
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold">Tokenomics</h2>
           <p className="mt-3 text-white/80">
@@ -424,7 +412,6 @@ function Tokenomics(): ReactElement {
           </p>
         </div>
 
-        {/* Right column: chart + our legend */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
           <div className="h-96 md:h-[28rem]">
             <ResponsiveContainer width="100%" height="100%">
@@ -443,25 +430,16 @@ function Tokenomics(): ReactElement {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-
-                {/* Tooltip fixed to top-right so it never covers the legend */}
-                <Tooltip
-                  content={<CustomTooltip />}
-                  position={{ x: undefined, y: 12 }} // pin to top; x auto near cursor
-                  wrapperStyle={{ pointerEvents: "none" }}
-                />
+                <Tooltip content={<CustomTooltip />} position={{ x: undefined, y: 12 }} wrapperStyle={{ pointerEvents: "none" }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-
-          {/* Our legend below the chart (no overlap with the doughnut) */}
           <CustomLegend data={data} />
         </div>
       </div>
     </section>
   );
 }
-
 
 function Roadmap(): ReactElement {
   return (
@@ -470,7 +448,7 @@ function Roadmap(): ReactElement {
         <h2 className="text-2xl md:text-3xl font-extrabold">Roadmap</h2>
         <div className="mt-6 grid md:grid-cols-3 gap-6">
           {CONFIG.roadmap.map((col, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
+            <div key={i} className="bg-white/5 border border:white/10 rounded-2xl p-5">
               <h3 className="font-bold text-lg">{col.title}</h3>
               <ul className="mt-3 space-y-2 list-disc list-inside text-white/85">
                 {col.items.map((it, idx) => <li key={idx}>{it}</li>)}
