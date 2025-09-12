@@ -19,8 +19,8 @@ const CONFIG = {
     name: 'GAD Family',
     token: 'GAD',
     tagline: 'Safer Families. Smarter Money.',
-    logoUrl: './app/public/logo-32.png',
-    heroUrl: './app/icon-32-fixed_files/hero-family.png',
+    logoUrl: "/logo.png",
+    heroUrl: "/images/hero-family.png",
   },
   contract: {
     address: CONTRACT_ADDRESS,
@@ -35,7 +35,7 @@ const CONFIG = {
     bscscanUrl: BSCSCAN_URL,
     githubUrl: '#',
     appUrl: '#',
-    // твоя форма (можно заменить на ?usp=sf_link — тоже ок)
+    
     investForm: 'https://docs.google.com/forms/d/e/1FAIpQLScnYggks4ikZA3buSLazXkZiWhrQz6WT50aukkHQIFI3rUp9g/viewform?usp=sharing&ouid=111082380689727787961',
     investWallet: '0x4C0B07Ad19D47994639D18ac2Af2FF82A0F95F37',
   },
@@ -62,7 +62,7 @@ export default function Page(): ReactElement {
       <Header />
       <Hero />
       <ValueProps />
-      {/* показываем секцию со сроками и кнопкой перехода на Google Form */}
+      {/* Google Form */}
       <Invest />
       <TokenSection />
       <Tokenomics />
@@ -265,7 +265,7 @@ function Invest(): React.ReactElement {
           </div>
         </div>
 
-        {/* Google Form: кнопка -> открывает форму в новой вкладке */}
+        {/* Google Form */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 pt-6 text-center">
             <h3 className="font-bold">Apply / Register interest</h3>
@@ -470,3 +470,4 @@ function Footer(): ReactElement {
     </footer>
   );
 }
+
