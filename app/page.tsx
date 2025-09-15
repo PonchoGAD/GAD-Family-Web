@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import type { ReactElement } from 'react';
@@ -134,13 +134,16 @@ function Hero(): ReactElement {
         <div className="mx-auto w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shadow-lg">
           <Coins className="w-10 h-10 text-[#ffd166]" />
         </div>
+
         <h1 className="mt-6 text-4xl md:text-5xl font-extrabold leading-tight">
           {CONFIG.brand.name} — {CONFIG.brand.tagline}
         </h1>
+
         <p className="mt-4 text-white/80 max-w-3xl mx-auto">
           {CONFIG.brand.token} is a real-utility token powering family safety, healthy habits, and a simple shared wallet.
           Contract: <span className="font-mono bg-white/10 px-2 py-1 rounded">{CONFIG.contract.address}</span>
         </p>
+
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <a
             href={CONFIG.links.buyUrl}
@@ -150,6 +153,7 @@ function Hero(): ReactElement {
           >
             <Wallet className="w-5 h-5" /> Buy GAD
           </a>
+
           <a
             href={CONFIG.links.liquidityUrl}
             target="_blank"
@@ -158,11 +162,22 @@ function Hero(): ReactElement {
           >
             <Lock className="w-5 h-5" /> Add Liquidity
           </a>
+
+          {/* NEW: link to the app page */}
+          <a
+            href="/app"
+            className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition"
+            title="Introducing our upcoming app"
+          >
+            Introducing our app →
+          </a>
         </div>
 
         <div className="relative max-w-5xl mx-auto mt-6 px-4">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="font-extrabold text-[56px] md:text-[80px] tracking-[0.3em] text-white/5 select-none">GAD FAMILY</span>
+            <span className="font-extrabold text-[56px] md:text-[80px] tracking-[0.3em] text-white/5 select-none">
+              GAD FAMILY
+            </span>
           </div>
 
           {hasHero ? (
@@ -187,6 +202,7 @@ function Hero(): ReactElement {
     </section>
   );
 }
+
 
 function ValueProps(): ReactElement {
   const items = [
