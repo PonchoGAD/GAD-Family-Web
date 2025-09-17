@@ -1,4 +1,6 @@
 'use client';
+import React from 'react';
+
 type PoolCfg = { id:number; name:string; lpToken:string; allocPoint:number; pairUrl:string; };
 type FarmingConfig = {
   masterChef:string; rewardToken:string; rewardDecimals:number;
@@ -6,9 +8,20 @@ type FarmingConfig = {
   bonusMultiplier:number; totalRewards:string; pools: PoolCfg[];
 };
 
-export default function HowToFarm({ cfg }: { cfg: FarmingConfig }) {
-  const usdt = cfg.pools.find(p => p.name.toLowerCase().includes('usdt'));
-  const bnb  = cfg.pools.find(p => p.name.toLowerCase().includes('bnb'));
+export default function HowToFarm() {
+  const [cfg, setCfg] = React.useState<FarmingConfig | null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/farming-config', { cache: 'no-store' });
+        setCfg(await res.json());
+      } catch {}
+    })();
+  }, []);
+
+  const usdt = cfg?.pools.find(p => p.name.toLowerCase().includes('usdt'));
+  const bnb  = cfg?.pools.find(p => p.name.toLowerCase().includes('bnb'));
 
   return (
     <section className="max-w-5xl mx-auto px-4 py-10">
