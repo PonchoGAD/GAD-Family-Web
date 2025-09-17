@@ -10,10 +10,15 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+
+import './globals.css'
+import NavBar from '../app/components/NavBar';
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="bg-[#0b0f17] text-white">
+        <NavBar />
         {children}
         <Analytics /> {/* подключение аналитики Vercel */}
       </body>
