@@ -17,7 +17,7 @@ export async function GET() {
         lpToken: "0xFf74Ed4c41743a2ff1Cf2e3869E8617143cceBf1",
         allocPoint: 70,
         pairUrl:
-          "https://pancakeswap.finance/v2/pair/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc"
+          pairUrl: "https://pancakeswap.finance/add/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc"
       },
       {
         id: 1,
@@ -25,7 +25,7 @@ export async function GET() {
         lpToken: "0x85c6BAFce7880484a417cb5d7067FDE843328997",
         allocPoint: 30,
         pairUrl:
-          "https://pancakeswap.finance/v2/pair/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62/BNB?chain=bsc"
+          "pairUrl: "https://pancakeswap.finance/add/0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc"
       }
     ]
   };

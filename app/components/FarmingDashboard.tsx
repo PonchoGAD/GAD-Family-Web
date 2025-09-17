@@ -1,8 +1,10 @@
 'use client';
 
 import React from 'react';
-import { BrowserProvider, Contract, formatUnits, parseUnits } from 'ethers';
+import { BrowserProvider, Contract, formatUnits, parseUnits, getAddress } from 'ethers';
 import clsx from 'clsx';
+import GetLpHelp from './GetLpHelp';
+
 
 // ---- minimal ABIs ----
 const ERC20_ABI = [
@@ -128,6 +130,7 @@ export default function FarmingDashboard() {
   );
 }
 
+
 function PoolCard({
   cfg,
   pool,
@@ -153,8 +156,10 @@ function PoolCard({
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
     const signer = await provider.getSigner();
-    const lp = new Contract(pool.lpToken, ERC20_ABI, provider);
-    const chef = new Contract(cfg.masterChef, MASTERCHEF_ABI, provider);
+    const normalizedLP = getAddress(pool.lpToken.trim());
+    const normalizedChef = getAddress(cfg.masterChef.trim());
+    const lp = new Contract(normalizedLP, ERC20_ABI, provider);
+    const chef = new Contract(normalizedChef, MASTERCHEF_ABI, provider);
 
     const d = await lp.decimals().catch(()=>18);
     setLpDecimals(Number(d));
@@ -165,7 +170,8 @@ function PoolCard({
     const userInfo = await chef.userInfo(pool.id, account);
     setStaked(formatUnits(userInfo[0], d));
 
-    const allo = await lp.allowance(account, cfg.masterChef);
+    const normalizedChef2 = getAddress(cfg.masterChef.trim());
+    const allo = await lp.allowance(account, normalizedChef2);
     setAllowance(formatUnits(allo, d));
 
     const pend = await chef.pendingReward(pool.id, account);
@@ -183,8 +189,10 @@ function PoolCard({
     setBusy(true); setMsg('');
     try {
       const signer = await provider.getSigner();
-      const lp = new Contract(pool.lpToken, ERC20_ABI, signer);
-      const tx = await lp.approve(cfg.masterChef, parseUnits('1000000000000', lpDecimals));
+      const normalizedLP = getAddress(pool.lpToken.trim());
+      const normalizedChef = getAddress(cfg.masterChef.trim());
+      const lp = new Contract(normalizedLP, ERC20_ABI, signer);
+      const tx = await lp.approve(normalizedChef, parseUnits('1000000000000', lpDecimals));
       await tx.wait();
       setMsg('Approved');
       await refresh();
@@ -200,7 +208,7 @@ function PoolCard({
     setBusy(true); setMsg('');
     try {
       const signer = await provider.getSigner();
-      const chef = new Contract(cfg.masterChef, MASTERCHEF_ABI, signer);
+      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
       const tx = await chef.deposit(pool.id, parseUnits(amount, lpDecimals));
       await tx.wait();
       setAmount('');
@@ -218,7 +226,7 @@ function PoolCard({
     setBusy(true); setMsg('');
     try {
       const signer = await provider.getSigner();
-      const chef = new Contract(cfg.masterChef, MASTERCHEF_ABI, signer);
+      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
       const tx = await chef.withdraw(pool.id, parseUnits(amount, lpDecimals));
       await tx.wait();
       setAmount('');
@@ -236,7 +244,7 @@ function PoolCard({
     setBusy(true); setMsg('');
     try {
       const signer = await provider.getSigner();
-      const chef = new Contract(cfg.masterChef, MASTERCHEF_ABI, signer);
+      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
       const tx = await chef.deposit(pool.id, 0); // harvest
       await tx.wait();
       setMsg('Harvested');
