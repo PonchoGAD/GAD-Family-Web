@@ -19,3 +19,10 @@ export default function NavBar() {
     </header>
   );
 }
+
+<Link
+  href="/airdrop"
+  className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90"
+>
+  🚀 Airdrop
+</Link>

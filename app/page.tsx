@@ -145,21 +145,21 @@ function Hero(): ReactElement {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-  {/* NEW: Airdrop button */}
-  <a
-    href="/airdrop"
-    className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2 text-lg shadow-lg shadow-yellow-500/20"
-    title="Join Airdrop"
-  >
-    🚀 Airdrop
-  </a>
+        {/* NEW: Airdrop button */}
+        <a
+        href="/airdrop"
+        className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2 text-lg shadow-lg shadow-yellow-500/20"
+        title="Join Airdrop"
+        >
+        🚀 Airdrop
+        </a>
 
-  <a
-    href={CONFIG.links.buyUrl}
-    target="_blank"
-    rel="noreferrer noopener"
-    className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2"
-  >
+        <a
+        href={CONFIG.links.buyUrl}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2"
+        >
     <Wallet className="w-5 h-5" /> Buy GAD
   </a>
 
