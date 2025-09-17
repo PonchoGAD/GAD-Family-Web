@@ -145,33 +145,41 @@ function Hero(): ReactElement {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={CONFIG.links.buyUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2"
-          >
-            <Wallet className="w-5 h-5" /> Buy GAD
-          </a>
+  {/* NEW: Airdrop button */}
+  <a
+    href="/airdrop"
+    className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2 text-lg shadow-lg shadow-yellow-500/20"
+    title="Join Airdrop"
+  >
+    🚀 Airdrop
+  </a>
 
-          <a
-            href={CONFIG.links.liquidityUrl}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="px-5 py-3 rounded-2xl border border-white/20 hover:border-white/40 transition flex items-center gap-2"
-          >
-            <Lock className="w-5 h-5" /> Add Liquidity
-          </a>
+  <a
+    href={CONFIG.links.buyUrl}
+    target="_blank"
+    rel="noreferrer noopener"
+    className="px-5 py-3 rounded-2xl bg-[#ffd166] text-[#0b0f17] font-bold hover:scale-[1.02] transition flex items-center gap-2"
+  >
+    <Wallet className="w-5 h-5" /> Buy GAD
+  </a>
 
-          {/* NEW: link to the app page */}
-          <a
-            href="/app"
-            className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition"
-            title="Introducing our upcoming app"
-          >
-            Introducing our app →
-          </a>
-        </div>
+  <a
+    href={CONFIG.links.liquidityUrl}
+    target="_blank"
+    rel="noreferrer noopener"
+    className="px-5 py-3 rounded-2xl border border-white/20 hover:border-white/40 transition flex items-center gap-2"
+  >
+    <Lock className="w-5 h-5" /> Add Liquidity
+  </a>
+
+  <a
+    href="/app"
+    className="px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 transition"
+    title="Introducing our upcoming app"
+  >
+    Introducing our app →
+  </a>
+</div>
 
         <div className="relative max-w-5xl mx-auto mt-6 px-4">
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
