@@ -3,15 +3,15 @@
 import React from 'react';
 import { BrowserProvider, Contract, formatUnits, parseUnits, getAddress } from 'ethers';
 import clsx from 'clsx';
-import GetLpHelp from './GetLpHelp';
-
+// (опционально) если используешь подсказки сверху страницы
+// import GetLpHelp from './GetLpHelp';
 
 // ---- minimal ABIs ----
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
   'function balanceOf(address) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
-  'function approve(address spender, uint256 amount) returns (bool)'
+  'function approve(address spender, uint256 amount) returns (bool)',
 ];
 
 const MASTERCHEF_ABI = [
@@ -25,7 +25,7 @@ const MASTERCHEF_ABI = [
   'function totalAllocPoint() view returns (uint256)',
   'function bonusEndBlock() view returns (uint256)',
   'function startBlock() view returns (uint256)',
-  'function baseRewardPerBlock() view returns (uint256)'
+  'function baseRewardPerBlock() view returns (uint256)',
 ];
 
 // ---- types ----
@@ -51,6 +51,37 @@ export type FarmingConfig = {
 
 const BSC_CHAIN_ID = 56;
 
+// ---- helpers to switch network ----
+async function switchToBsc(): Promise<void> {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) throw new Error('MetaMask not found');
+  try {
+    // попытка переключиться на BSC
+    await ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x38' }], // 56
+    });
+  } catch (err: any) {
+    // если сети нет в кошельке — добавляем
+    if (err?.code === 4902) {
+      await ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [
+          {
+            chainId: '0x38',
+            chainName: 'BNB Smart Chain',
+            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+            rpcUrls: ['https://bsc-dataseed.binance.org/'],
+            blockExplorerUrls: ['https://bscscan.com'],
+          },
+        ],
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
 export default function FarmingDashboard() {
   const [cfg, setCfg] = React.useState<FarmingConfig | null>(null);
   const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
@@ -58,26 +89,63 @@ export default function FarmingDashboard() {
   const [chainId, setChainId] = React.useState<number | null>(null);
   const [err, setErr] = React.useState<string>('');
 
+  // --------- LOAD CONFIG (API -> public -> fallback) ----------
   React.useEffect(() => {
     (async () => {
       try {
         const res = await fetch('/api/farming-config', { cache: 'no-store' });
-        const data = await res.json();
-        setCfg(data);
-      } catch (e: any) {
-        setErr('Failed to load farming config');
-      }
+        if (res.ok) {
+          setCfg(await res.json());
+          return;
+        }
+        const res2 = await fetch('/farming.config.json', { cache: 'no-store' }).catch(() => null as any);
+        if (res2?.ok) {
+          setCfg(await res2.json());
+          return;
+        }
+      } catch {}
+      // встроенный дефолт — чтобы UI не ломался
+      setCfg({
+        masterChef: '0x5C5c0b9eE66CC106f90D7b1a3727dc126C4eF188',
+        rewardToken: '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62',
+        rewardDecimals: 18,
+        rewardPerBlock: '16534391534391536',
+        startBlock: '61230868',
+        bonusEndBlock: '62094868',
+        bonusMultiplier: 2,
+        totalRewards: '100000000000000000000000000000',
+        pools: [
+          {
+            id: 0,
+            name: 'GAD–USDT LP',
+            lpToken: '0xFf74Ed4c41743a2ff1C2e3869E861743cceBf1',
+            allocPoint: 70,
+            pairUrl:
+              'https://pancakeswap.finance/add/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
+          },
+          {
+            id: 1,
+            name: 'GAD–BNB LP',
+            lpToken: '0x85c6BAFce7880484a417cb5d7067FDE843328997',
+            allocPoint: 30,
+            pairUrl:
+              'https://pancakeswap.finance/add/0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
+          },
+        ],
+      });
     })();
   }, []);
 
+  // --------- CONNECT WALLET ----------
   const connect = async () => {
     setErr('');
     try {
-      if (!(window as any).ethereum) {
+      const eth = (window as any).ethereum;
+      if (!eth) {
         setErr('MetaMask not found');
         return;
       }
-      const prov = new BrowserProvider((window as any).ethereum);
+      const prov = new BrowserProvider(eth);
       const network = await prov.getNetwork();
       setChainId(Number(network.chainId));
       if (Number(network.chainId) !== BSC_CHAIN_ID) {
@@ -86,8 +154,31 @@ export default function FarmingDashboard() {
       const accs = await prov.send('eth_requestAccounts', []);
       setProvider(prov);
       setAccount(accs[0]);
+
+      // слушатели смены сети/аккаунта
+      eth.on?.('chainChanged', () => window.location.reload());
+      eth.on?.('accountsChanged', (accs: string[]) => {
+        setAccount(accs?.[0] || '');
+      });
     } catch (e: any) {
       setErr(e?.message || 'Failed to connect wallet');
+    }
+  };
+
+  // --------- SWITCH NETWORK BUTTON ----------
+  const handleSwitch = async () => {
+    try {
+      await switchToBsc();
+      setErr('');
+      // после переключения обновим провайдера/сеть
+      if ((window as any).ethereum) {
+        const prov = new BrowserProvider((window as any).ethereum);
+        const network = await prov.getNetwork();
+        setProvider(prov);
+        setChainId(Number(network.chainId));
+      }
+    } catch (e: any) {
+      setErr(e?.message || 'Failed to switch network');
     }
   };
 
@@ -95,12 +186,19 @@ export default function FarmingDashboard() {
     <section className="max-w-5xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl md:text-3xl font-extrabold">Liquidity Mining</h2>
-        <button
-          onClick={connect}
-          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
-        >
-          {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect Wallet'}
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSwitch}
+            className="px-3 py-2 rounded-xl border border-white/20 hover:border-white/40 text-sm"
+          >
+            Switch to BNB Chain
+          </button>
+
+          <button onClick={connect} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+            {account ? `${account.slice(0, 6)}…${account.slice(-4)}` : 'Connect Wallet'}
+          </button>
+        </div>
       </div>
 
       {cfg ? (
@@ -109,6 +207,9 @@ export default function FarmingDashboard() {
             Rewards pool: 100B GAD • Bonus x{cfg.bonusMultiplier} until block {cfg.bonusEndBlock}
           </p>
           {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
+
+          {/* (опционально) быстрые ссылки — если используешь GetLpHelp */}
+          {/* <GetLpHelp /> */}
 
           <div className="mt-6 grid md:grid-cols-2 gap-6">
             {cfg.pools.map((p) => (
@@ -130,13 +231,12 @@ export default function FarmingDashboard() {
   );
 }
 
-
 function PoolCard({
   cfg,
   pool,
   provider,
   account,
-  disabled
+  disabled,
 }: {
   cfg: FarmingConfig;
   pool: PoolCfg;
@@ -155,27 +255,29 @@ function PoolCard({
 
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
-    const signer = await provider.getSigner();
-    const normalizedLP = getAddress(pool.lpToken.trim());
-    const normalizedChef = getAddress(cfg.masterChef.trim());
-    const lp = new Contract(normalizedLP, ERC20_ABI, provider);
-    const chef = new Contract(normalizedChef, MASTERCHEF_ABI, provider);
+    try {
+      const normalizedLP = getAddress(pool.lpToken.trim());
+      const normalizedChef = getAddress(cfg.masterChef.trim());
+      const lp = new Contract(normalizedLP, ERC20_ABI, provider);
+      const chef = new Contract(normalizedChef, MASTERCHEF_ABI, provider);
 
-    const d = await lp.decimals().catch(()=>18);
-    setLpDecimals(Number(d));
+      const d = await lp.decimals().catch(() => 18);
+      setLpDecimals(Number(d));
 
-    const bal = await lp.balanceOf(account);
-    setLpBalance(formatUnits(bal, d));
+      const bal = await lp.balanceOf(account);
+      setLpBalance(formatUnits(bal, d));
 
-    const userInfo = await chef.userInfo(pool.id, account);
-    setStaked(formatUnits(userInfo[0], d));
+      const userInfo = await chef.userInfo(pool.id, account);
+      setStaked(formatUnits(userInfo[0], d));
 
-    const normalizedChef2 = getAddress(cfg.masterChef.trim());
-    const allo = await lp.allowance(account, normalizedChef2);
-    setAllowance(formatUnits(allo, d));
+      const allo = await lp.allowance(account, normalizedChef);
+      setAllowance(formatUnits(allo, d));
 
-    const pend = await chef.pendingReward(pool.id, account);
-    setPending(formatUnits(pend, cfg.rewardDecimals));
+      const pend = await chef.pendingReward(pool.id, account);
+      setPending(formatUnits(pend, cfg.rewardDecimals));
+    } catch (e: any) {
+      setMsg(e?.shortMessage || e?.message || 'Failed to refresh');
+    }
   }, [provider, account, cfg.masterChef, pool.id, pool.lpToken, cfg.rewardDecimals]);
 
   React.useEffect(() => {
@@ -186,7 +288,8 @@ function PoolCard({
 
   const approveMax = async () => {
     if (!provider) return;
-    setBusy(true); setMsg('');
+    setBusy(true);
+    setMsg('');
     try {
       const signer = await provider.getSigner();
       const normalizedLP = getAddress(pool.lpToken.trim());
@@ -205,7 +308,8 @@ function PoolCard({
 
   const deposit = async () => {
     if (!provider || !amount) return;
-    setBusy(true); setMsg('');
+    setBusy(true);
+    setMsg('');
     try {
       const signer = await provider.getSigner();
       const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
@@ -223,7 +327,8 @@ function PoolCard({
 
   const withdraw = async () => {
     if (!provider || !amount) return;
-    setBusy(true); setMsg('');
+    setBusy(true);
+    setMsg('');
     try {
       const signer = await provider.getSigner();
       const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
@@ -241,7 +346,8 @@ function PoolCard({
 
   const harvest = async () => {
     if (!provider) return;
-    setBusy(true); setMsg('');
+    setBusy(true);
+    setMsg('');
     try {
       const signer = await provider.getSigner();
       const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
@@ -262,12 +368,7 @@ function PoolCard({
     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
       <div className="flex items-center justify-between">
         <h3 className="font-bold">{pool.name}</h3>
-        <a
-          href={pool.pairUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs text-white/70 hover:underline"
-        >
+        <a href={pool.pairUrl} target="_blank" rel="noreferrer" className="text-xs text-white/70 hover:underline">
           Add Liquidity
         </a>
       </div>
@@ -283,17 +384,25 @@ function PoolCard({
         <input
           placeholder="Amount LP"
           value={amount}
-          onChange={(e)=>setAmount(e.target.value)}
+          onChange={(e) => setAmount(e.target.value)}
           className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 outline-none"
           disabled={disabled || busy}
         />
         {needApprove ? (
-          <button onClick={approveMax} className={btnCls(disabled, busy)} disabled={disabled || busy}>Approve</button>
+          <button onClick={approveMax} className={btnCls(disabled, busy)} disabled={disabled || busy}>
+            Approve
+          </button>
         ) : (
-          <button onClick={deposit} className={btnCls(disabled, busy)} disabled={disabled || busy}>Stake</button>
+          <button onClick={deposit} className={btnCls(disabled, busy)} disabled={disabled || busy}>
+            Stake
+          </button>
         )}
-        <button onClick={withdraw} className={btnOutlineCls(disabled, busy)} disabled={disabled || busy}>Unstake</button>
-        <button onClick={harvest} className={btnYellowCls(disabled, busy)} disabled={disabled || busy}>Harvest</button>
+        <button onClick={withdraw} className={btnOutlineCls(disabled, busy)} disabled={disabled || busy}>
+          Unstake
+        </button>
+        <button onClick={harvest} className={btnYellowCls(disabled, busy)} disabled={disabled || busy}>
+          Harvest
+        </button>
       </div>
 
       {msg && <div className="mt-3 text-xs text-white/70">{msg}</div>}
@@ -302,7 +411,7 @@ function PoolCard({
   );
 }
 
-function Stat({label, value}:{label:string; value:string}) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-black/30 rounded-xl p-3 border border-white/10">
       <div className="text-white/60 text-xs">{label}</div>
@@ -311,19 +420,16 @@ function Stat({label, value}:{label:string; value:string}) {
   );
 }
 
-function btnCls(disabled:boolean, busy:boolean) {
-  return clsx(
-    'px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15',
-    (disabled || busy) && 'opacity-50 cursor-not-allowed'
-  );
+function btnCls(disabled: boolean, busy: boolean) {
+  return clsx('px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15', (disabled || busy) && 'opacity-50 cursor-not-allowed');
 }
-function btnOutlineCls(disabled:boolean, busy:boolean) {
+function btnOutlineCls(disabled: boolean, busy: boolean) {
   return clsx(
     'px-4 py-2 rounded-xl border border-white/20 hover:border-white/40',
     (disabled || busy) && 'opacity-50 cursor-not-allowed'
   );
 }
-function btnYellowCls(disabled:boolean, busy:boolean) {
+function btnYellowCls(disabled: boolean, busy: boolean) {
   return clsx(
     'px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90',
     (disabled || busy) && 'opacity-50 cursor-not-allowed'
