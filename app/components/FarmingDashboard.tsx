@@ -226,8 +226,7 @@ function PoolCard({
   const rewardPerBlockBig = BigInt(cfg.rewardPerBlock); // общая эмиссия/блок в wei
   const poolPerBlockBig   = (rewardPerBlockBig * BigInt(pool.allocPoint)) / BigInt(totalAlloc);
   const poolPerBlockStr   = formatUnits(poolPerBlockBig, cfg.rewardDecimals);
-  const blocksPerDayBig   = 28800n; // ~3s/block на BSC
-  const perDayBig         = poolPerBlockBig * blocksPerDayBig;
+  const blocksPerDayBig   = BigInt(28800);  const perDayBig         = poolPerBlockBig * blocksPerDayBig;
   const perDayStr         = formatUnits(perDayBig, cfg.rewardDecimals);
 
   const refresh = React.useCallback(async () => {
