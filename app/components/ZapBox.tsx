@@ -29,8 +29,9 @@ const ERC20_ABI = [
 ];
 
 /** helpers */
-const lc = (s: string) => (s || '').trim().toLowerCase();     // для path — убираем проверку checksum
-const sanitizeNum = (s: string) => (s || '').replace(',', '.').replace(/\s/g, ''); // меняем запятую на точку
+const lc = (s: string) => (s || '').trim().toLowerCase();                 // для path — без checksum
+const B  = (n: number | string) => BigInt(n);                              // вместо литералов 0n/2n/10000n
+const sanitizeNum = (s: string) => (s || '').replace(',', '.').replace(/\s/g, '');
 
 export default function ZapBox() {
   const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
@@ -86,57 +87,54 @@ export default function ZapBox() {
   /** ---- slippage helper ---- */
   const applySlippage = (amountOut: bigint) => {
     const bps = BigInt(slippageBps);
-    return (amountOut * (BigInt(10000) - bps)) / BigInt(10000);
+    return (amountOut * (B(10000) - bps)) / B(10000);
   };
 
   /** ================= ZAP: BNB -> GAD/WBNB ================= */
-const zapBNB = async () => {
-  if (!provider) return setMsg('Connect wallet');
-  setBusy(true); setMsg('');
-  try {
-    const router = await getRouter();
-    const zap    = await getZap(true);
-    if (!router || !zap) throw new Error('Router or Zap not ready');
-
-    // нормализуем число (заменяем запятую)
-    const amountStr = sanitizeNum(bnbAmount || '0');
-    const totalBNB = parseUnits(amountStr, 18);
-    if (totalBNB <= BigInt(0)) throw new Error('Amount must be > 0');
-
-    const half = totalBNB / BigInt(2);
-
-    // попробуем оценить выход (WBNB -> GAD). Если не выйдет — пойдём без minOut.
-    let minGad: bigint = BigInt(0);
+  const zapBNB = async () => {
+    if (!provider) return setMsg('Connect wallet');
+    setBusy(true); setMsg('');
     try {
-      const path = [lc(WBNB_ADDR), lc(GAD_ADDR)];
-      const amounts: any = await router.getAmountsOut(half, path);
-      const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
-      const expectedGAD = BigInt(last.toString());
-      minGad = applySlippage(expectedGAD);
-    } catch {
-      // оставляем minGad = 0
+      const router = await getRouter();
+      const zap    = await getZap(true);
+      if (!router || !zap) throw new Error('Router or Zap not ready');
+
+      // нормализуем число (заменяем запятую)
+      const amountStr = sanitizeNum(bnbAmount || '0');
+      const totalBNB = parseUnits(amountStr, 18);
+      if (totalBNB <= B(0)) throw new Error('Amount must be > 0');
+
+      const half = totalBNB / B(2);
+
+      // оценим выход (WBNB -> GAD), если не выйдет — пойдём без minOut
+      let minGad: bigint = B(0);
+      try {
+        const path: string[] = [lc(WBNB_ADDR), lc(GAD_ADDR)];
+        const amounts: any = await (router as any).getAmountsOut(half, path);
+        const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
+        const expectedGAD = BigInt(last.toString());
+        minGad = applySlippage(expectedGAD);
+      } catch {}
+
+      const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
+
+      // сначала пробуем с minGad, если роутер/ликвидность не дают — фолбэк с нулями
+      try {
+        const tx = await (zap as any).zapWithBNB(minGad, B(0), deadline, { value: totalBNB });
+        await tx.wait();
+      } catch {
+        const tx2 = await (zap as any).zapWithBNB(B(0), B(0), deadline, { value: totalBNB });
+        await tx2.wait();
+      }
+
+      setMsg('Zapped with BNB ✅');
+      setBnbAmount('');
+    } catch (e: any) {
+      setMsg(e?.shortMessage || e?.message || 'Zap failed');
+    } finally {
+      setBusy(false);
     }
-
-    const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
-
-    // 1-я попытка: с рассчитанным minGad
-    try {
-      const tx = await zap.zapWithBNB(minGad, BigInt(0), deadline, { value: totalBNB });
-      await tx.wait();
-    } catch (e1: any) {
-      // Фолбэк: без minOut вообще (защитит от "missing revert data / insufficient output")
-      const tx2 = await zap.zapWithBNB(BigInt(0), BigInt(0), deadline, { value: totalBNB });
-      await tx2.wait();
-    }
-
-    setMsg('Zapped with BNB ✅');
-    setBnbAmount('');
-  } catch (e: any) {
-    setMsg(e?.shortMessage || e?.message || 'Zap failed');
-  } finally {
-    setBusy(false);
-  }
-};
+  };
 
   /** ============== ZAP: USDT -> GAD/USDT =================== */
   const zapUSDT = async () => {
@@ -148,32 +146,33 @@ const zapBNB = async () => {
       const usdt   = await getUsdt(true);
       if (!router || !zap || !usdt) throw new Error('Contracts not ready');
 
-      // нормализуем число (заменяем запятую)
-      const amt = parseUnits(sanitizeNum(usdtAmount || '0'), 18);
-      if (amt <= BigInt(0)) throw new Error('Amount must be > 0');
+      const amt = parseUnits(sanitizeNum(usdtAmount || '0'), 18); // USDT на BSC часто 18
+      if (amt <= B(0)) throw new Error('Amount must be > 0');
 
       // approve если не хватает allowance
       const usdtRead = await getUsdt(false);
       const allowance: bigint = await (usdtRead as any).allowance(account, ZAP_ADDR);
       if (allowance < amt) {
-        const txa = await usdt.approve(ZAP_ADDR, parseUnits('1000000000000', 18)); // «практич.∞»
+        const txa = await (usdt as any).approve(ZAP_ADDR, parseUnits('1000000000000', 18)); // практич.∞
         await txa.wait();
       }
 
-      // половина идёт на покупку GAD (маршрут USDT -> WBNB -> GAD)
-      const half = amt / BigInt(2);
+      // половина идёт на покупку GAD (USDT -> WBNB -> GAD)
+      const half = amt / B(2);
 
-      const path = [lc(USDT_ADDR), lc(WBNB_ADDR), lc(GAD_ADDR)];
-      const amounts: any = await router.getAmountsOut(half, path);
+      const path: string[] = [lc(USDT_ADDR), lc(WBNB_ADDR), lc(GAD_ADDR)];
+      const amounts: any = await (router as any).getAmountsOut(half, path);
       const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
       const expectedGAD = BigInt(last.toString());
+
       const minGad  = applySlippage(expectedGAD);
-      const minUSDT = applySlippage(amt - half); // минимум USDT для addLiquidity (вторая половина)
+      const minUSDT = applySlippage(amt - half); // минимум USDT на вторую ногу ликвидности
 
       const deadline = Math.floor(Date.now() / 1000) + 600;
 
-      const tx = await zap.zapWithUSDT(amt, minGad, minUSDT, deadline);
+      const tx = await (zap as any).zapWithUSDT(amt, minGad, minUSDT, deadline);
       await tx.wait();
+
       setMsg('Zapped with USDT ✅');
       setUsdtAmount('');
     } catch (e: any) {
