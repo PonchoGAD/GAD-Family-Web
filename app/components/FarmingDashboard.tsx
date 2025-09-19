@@ -3,8 +3,15 @@
 import React from 'react';
 import { BrowserProvider, Contract, formatUnits, parseUnits, getAddress } from 'ethers';
 import clsx from 'clsx';
-// (опционально) если используешь подсказки сверху страницы
-// import GetLpHelp from './GetLpHelp';
+// import GetLpHelp from './GetLpHelp'; // включи при необходимости
+
+// ---- address helpers ----
+const isHexAddress = (s: string) => /^0x[0-9a-fA-F]{40}$/.test((s || '').trim());
+const normAddr = (s: string) => {
+  const t = (s || '').trim();
+  if (!isHexAddress(t)) return null;
+  try { return getAddress(t); } catch { return t; } // допустим даже без checksum
+};
 
 // ---- minimal ABIs ----
 const ERC20_ABI = [
@@ -51,30 +58,23 @@ export type FarmingConfig = {
 
 const BSC_CHAIN_ID = 56;
 
-// ---- helpers to switch network ----
+// ---- network switch helper ----
 async function switchToBsc(): Promise<void> {
   const ethereum = (window as any).ethereum;
   if (!ethereum) throw new Error('MetaMask not found');
   try {
-    // попытка переключиться на BSC
-    await ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: '0x38' }], // 56
-    });
+    await ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
   } catch (err: any) {
-    // если сети нет в кошельке — добавляем
     if (err?.code === 4902) {
       await ethereum.request({
         method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: '0x38',
-            chainName: 'BNB Smart Chain',
-            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-            rpcUrls: ['https://bsc-dataseed.binance.org/'],
-            blockExplorerUrls: ['https://bscscan.com'],
-          },
-        ],
+        params: [{
+          chainId: '0x38',
+          chainName: 'BNB Smart Chain',
+          nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+          rpcUrls: ['https://bsc-dataseed.binance.org/'],
+          blockExplorerUrls: ['https://bscscan.com'],
+        }],
       });
     } else {
       throw err;
@@ -89,22 +89,15 @@ export default function FarmingDashboard() {
   const [chainId, setChainId] = React.useState<number | null>(null);
   const [err, setErr] = React.useState<string>('');
 
-  // --------- LOAD CONFIG (API -> public -> fallback) ----------
+  // ---- load config: API -> public -> fallback
   React.useEffect(() => {
     (async () => {
       try {
         const res = await fetch('/api/farming-config', { cache: 'no-store' });
-        if (res.ok) {
-          setCfg(await res.json());
-          return;
-        }
+        if (res.ok) { setCfg(await res.json()); return; }
         const res2 = await fetch('/farming.config.json', { cache: 'no-store' }).catch(() => null as any);
-        if (res2?.ok) {
-          setCfg(await res2.json());
-          return;
-        }
+        if (res2?.ok) { setCfg(await res2.json()); return; }
       } catch {}
-      // встроенный дефолт — чтобы UI не ломался
       setCfg({
         masterChef: '0x5C5c0b9eE66CC106f90D7b1a3727dc126C4eF188',
         rewardToken: '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62',
@@ -120,57 +113,45 @@ export default function FarmingDashboard() {
             name: 'GAD–USDT LP',
             lpToken: '0xFf74Ed4c41743a2ff1C2e3869E861743cceBf1',
             allocPoint: 70,
-            pairUrl:
-              'https://pancakeswap.finance/add/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
+            pairUrl: 'https://pancakeswap.finance/add/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
           },
           {
             id: 1,
             name: 'GAD–BNB LP',
             lpToken: '0x85c6BAFce7880484a417cb5d7067FDE843328997',
             allocPoint: 30,
-            pairUrl:
-              'https://pancakeswap.finance/add/0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
+            pairUrl: 'https://pancakeswap.finance/add/0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc',
           },
         ],
       });
     })();
   }, []);
 
-  // --------- CONNECT WALLET ----------
+  // ---- connect wallet
   const connect = async () => {
     setErr('');
     try {
       const eth = (window as any).ethereum;
-      if (!eth) {
-        setErr('MetaMask not found');
-        return;
-      }
+      if (!eth) { setErr('MetaMask not found'); return; }
       const prov = new BrowserProvider(eth);
       const network = await prov.getNetwork();
       setChainId(Number(network.chainId));
-      if (Number(network.chainId) !== BSC_CHAIN_ID) {
-        setErr('Wrong network. Switch to BNB Smart Chain (56).');
-      }
+      if (Number(network.chainId) !== BSC_CHAIN_ID) setErr('Wrong network. Switch to BNB Smart Chain (56).');
       const accs = await prov.send('eth_requestAccounts', []);
       setProvider(prov);
       setAccount(accs[0]);
-
-      // слушатели смены сети/аккаунта
       eth.on?.('chainChanged', () => window.location.reload());
-      eth.on?.('accountsChanged', (accs: string[]) => {
-        setAccount(accs?.[0] || '');
-      });
+      eth.on?.('accountsChanged', (accs: string[]) => setAccount(accs?.[0] || ''));
     } catch (e: any) {
       setErr(e?.message || 'Failed to connect wallet');
     }
   };
 
-  // --------- SWITCH NETWORK BUTTON ----------
+  // ---- switch network
   const handleSwitch = async () => {
     try {
       await switchToBsc();
       setErr('');
-      // после переключения обновим провайдера/сеть
       if ((window as any).ethereum) {
         const prov = new BrowserProvider((window as any).ethereum);
         const network = await prov.getNetwork();
@@ -186,17 +167,12 @@ export default function FarmingDashboard() {
     <section className="max-w-5xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl md:text-3xl font-extrabold">Liquidity Mining</h2>
-
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleSwitch}
-            className="px-3 py-2 rounded-xl border border-white/20 hover:border-white/40 text-sm"
-          >
+          <button onClick={handleSwitch} className="px-3 py-2 rounded-xl border border-white/20 hover:border-white/40 text-sm">
             Switch to BNB Chain
           </button>
-
           <button onClick={connect} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-            {account ? `${account.slice(0, 6)}…${account.slice(-4)}` : 'Connect Wallet'}
+            {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect Wallet'}
           </button>
         </div>
       </div>
@@ -207,10 +183,7 @@ export default function FarmingDashboard() {
             Rewards pool: 100B GAD • Bonus x{cfg.bonusMultiplier} until block {cfg.bonusEndBlock}
           </p>
           {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
-
-          {/* (опционально) быстрые ссылки — если используешь GetLpHelp */}
           {/* <GetLpHelp /> */}
-
           <div className="mt-6 grid md:grid-cols-2 gap-6">
             {cfg.pools.map((p) => (
               <PoolCard
@@ -232,17 +205,9 @@ export default function FarmingDashboard() {
 }
 
 function PoolCard({
-  cfg,
-  pool,
-  provider,
-  account,
-  disabled,
+  cfg, pool, provider, account, disabled,
 }: {
-  cfg: FarmingConfig;
-  pool: PoolCfg;
-  provider: BrowserProvider | null;
-  account: string;
-  disabled: boolean;
+  cfg: FarmingConfig; pool: PoolCfg; provider: BrowserProvider | null; account: string; disabled: boolean;
 }) {
   const [lpDecimals, setLpDecimals] = React.useState<number>(18);
   const [lpBalance, setLpBalance] = React.useState<string>('0');
@@ -256,10 +221,12 @@ function PoolCard({
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
     try {
-      const normalizedLP = getAddress(pool.lpToken.trim());
-      const normalizedChef = getAddress(cfg.masterChef.trim());
-      const lp = new Contract(normalizedLP, ERC20_ABI, provider);
-      const chef = new Contract(normalizedChef, MASTERCHEF_ABI, provider);
+      const lpAddr = normAddr(pool.lpToken);
+      const chefAddr = normAddr(cfg.masterChef);
+      if (!lpAddr || !chefAddr) { setMsg('Config error: invalid LP or MasterChef address'); return; }
+
+      const lp   = new Contract(lpAddr,   ERC20_ABI,       provider);
+      const chef = new Contract(chefAddr, MASTERCHEF_ABI,  provider);
 
       const d = await lp.decimals().catch(() => 18);
       setLpDecimals(Number(d));
@@ -270,7 +237,7 @@ function PoolCard({
       const userInfo = await chef.userInfo(pool.id, account);
       setStaked(formatUnits(userInfo[0], d));
 
-      const allo = await lp.allowance(account, normalizedChef);
+      const allo = await lp.allowance(account, chefAddr);
       setAllowance(formatUnits(allo, d));
 
       const pend = await chef.pendingReward(pool.id, account);
@@ -288,78 +255,65 @@ function PoolCard({
 
   const approveMax = async () => {
     if (!provider) return;
-    setBusy(true);
-    setMsg('');
+    setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
-      const normalizedLP = getAddress(pool.lpToken.trim());
-      const normalizedChef = getAddress(cfg.masterChef.trim());
-      const lp = new Contract(normalizedLP, ERC20_ABI, signer);
-      const tx = await lp.approve(normalizedChef, parseUnits('1000000000000', lpDecimals));
+      const signer   = await provider.getSigner();
+      const lpAddr   = normAddr(pool.lpToken)!;
+      const chefAddr = normAddr(cfg.masterChef)!;
+
+      const lp = new Contract(lpAddr, ERC20_ABI, signer);
+      const tx = await lp.approve(chefAddr, parseUnits('1000000000000', lpDecimals)); // практич.∞
       await tx.wait();
       setMsg('Approved');
       await refresh();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Approve failed');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   const deposit = async () => {
     if (!provider || !amount) return;
-    setBusy(true);
-    setMsg('');
+    setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
-      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
+      const signer   = await provider.getSigner();
+      const chefAddr = normAddr(cfg.masterChef)!;
+      const chef = new Contract(chefAddr, MASTERCHEF_ABI, signer);
       const tx = await chef.deposit(pool.id, parseUnits(amount, lpDecimals));
       await tx.wait();
-      setAmount('');
-      setMsg('Staked');
-      await refresh();
+      setAmount(''); setMsg('Staked'); await refresh();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Stake failed');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   const withdraw = async () => {
     if (!provider || !amount) return;
-    setBusy(true);
-    setMsg('');
+    setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
-      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
+      const signer   = await provider.getSigner();
+      const chefAddr = normAddr(cfg.masterChef)!;
+      const chef = new Contract(chefAddr, MASTERCHEF_ABI, signer);
       const tx = await chef.withdraw(pool.id, parseUnits(amount, lpDecimals));
       await tx.wait();
-      setAmount('');
-      setMsg('Unstaked');
-      await refresh();
+      setAmount(''); setMsg('Unstaked'); await refresh();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Unstake failed');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   const harvest = async () => {
     if (!provider) return;
-    setBusy(true);
-    setMsg('');
+    setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
-      const chef = new Contract(getAddress(cfg.masterChef.trim()), MASTERCHEF_ABI, signer);
+      const signer   = await provider.getSigner();
+      const chefAddr = normAddr(cfg.masterChef)!;
+      const chef = new Contract(chefAddr, MASTERCHEF_ABI, signer);
       const tx = await chef.deposit(pool.id, 0); // harvest
       await tx.wait();
-      setMsg('Harvested');
-      await refresh();
+      setMsg('Harvested'); await refresh();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Harvest failed');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
   const needApprove = Number(allowance) < Number(amount || '0');
@@ -389,20 +343,12 @@ function PoolCard({
           disabled={disabled || busy}
         />
         {needApprove ? (
-          <button onClick={approveMax} className={btnCls(disabled, busy)} disabled={disabled || busy}>
-            Approve
-          </button>
+          <button onClick={approveMax} className={btnCls(disabled, busy)} disabled={disabled || busy}>Approve</button>
         ) : (
-          <button onClick={deposit} className={btnCls(disabled, busy)} disabled={disabled || busy}>
-            Stake
-          </button>
+          <button onClick={deposit} className={btnCls(disabled, busy)} disabled={disabled || busy}>Stake</button>
         )}
-        <button onClick={withdraw} className={btnOutlineCls(disabled, busy)} disabled={disabled || busy}>
-          Unstake
-        </button>
-        <button onClick={harvest} className={btnYellowCls(disabled, busy)} disabled={disabled || busy}>
-          Harvest
-        </button>
+        <button onClick={withdraw} className={btnOutlineCls(disabled, busy)} disabled={disabled || busy}>Unstake</button>
+        <button onClick={harvest} className={btnYellowCls(disabled, busy)} disabled={disabled || busy}>Harvest</button>
       </div>
 
       {msg && <div className="mt-3 text-xs text-white/70">{msg}</div>}
@@ -424,14 +370,8 @@ function btnCls(disabled: boolean, busy: boolean) {
   return clsx('px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15', (disabled || busy) && 'opacity-50 cursor-not-allowed');
 }
 function btnOutlineCls(disabled: boolean, busy: boolean) {
-  return clsx(
-    'px-4 py-2 rounded-xl border border-white/20 hover:border-white/40',
-    (disabled || busy) && 'opacity-50 cursor-not-allowed'
-  );
+  return clsx('px-4 py-2 rounded-xl border border-white/20 hover:border-white/40', (disabled || busy) && 'opacity-50 cursor-not-allowed');
 }
 function btnYellowCls(disabled: boolean, busy: boolean) {
-  return clsx(
-    'px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90',
-    (disabled || busy) && 'opacity-50 cursor-not-allowed'
-  );
+  return clsx('px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90', (disabled || busy) && 'opacity-50 cursor-not-allowed');
 }
