@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { BrowserProvider, Contract, parseUnits, formatUnits } from 'ethers';
+import { BrowserProvider, Contract, parseUnits } from 'ethers';
 import clsx from 'clsx';
 
 /** ====== CONSTANTS (BSC mainnet) ====== */
-const ZAP_ADDR     = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC'; // твой GADZap
+const ZAP_ADDR     = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC'; // GADZap
 const ROUTER_ADDR  = '0x10ED43C718714eb63d5aA57B78B54704E256024E'; // Pancake V2
 const GAD_ADDR     = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const USDT_ADDR    = '0x55d398326f99059fF775485246999027B3197955';
@@ -28,7 +28,10 @@ const ERC20_ABI = [
   'function approve(address spender, uint256 value) returns (bool)'
 ];
 
-/** ====== COMPONENT ====== */
+/** helpers */
+const lc = (s: string) => (s || '').trim().toLowerCase();     // для path — убираем проверку checksum
+const sanitizeNum = (s: string) => (s || '').replace(',', '.').replace(/\s/g, ''); // меняем запятую на точку
+
 export default function ZapBox() {
   const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
   const [account, setAccount]   = React.useState<string>('');
@@ -39,11 +42,6 @@ export default function ZapBox() {
   const [bnbAmount, setBnbAmount]   = React.useState<string>(''); // BNB строкой
   const [usdtAmount, setUsdtAmount] = React.useState<string>(''); // USDT строкой
   const [slippageBps, setSlippageBps] = React.useState<number>(1000); // 10% по умолчанию
-
-  // balances
-  const [bnbBalance, setBnbBalance]   = React.useState<string>('0');
-  const [usdtBalance, setUsdtBalance] = React.useState<string>('0');
-  const [usdtDecimals, setUsdtDecimals] = React.useState<number>(18); // USDT на BSC = 18
 
   /** ---- connect ---- */
   const connect = async () => {
@@ -85,36 +83,7 @@ export default function ZapBox() {
     return new Contract(USDT_ADDR, ERC20_ABI, provider);
   }, [provider]);
 
-  /** ---- balances loader ---- */
-  const loadBalances = React.useCallback(async () => {
-    if (!provider || !account) return;
-    try {
-      // BNB
-      const bnbWei = await provider.getBalance(account);
-      setBnbBalance(formatUnits(bnbWei, 18));
-
-      // USDT
-      const usdt = await getUsdt(false);
-      if (usdt) {
-        const dec = await usdt.decimals().catch(() => 18);
-        setUsdtDecimals(Number(dec));
-        const bal = await usdt.balanceOf(account);
-        setUsdtBalance(formatUnits(bal, dec));
-      }
-    } catch (e: any) {
-      // мягко игнорим, чтобы UI не падал
-    }
-  }, [provider, account, getUsdt]);
-
-  // автообновление балансов
-  React.useEffect(() => {
-    loadBalances();
-    if (!provider || !account) return;
-    const id = setInterval(loadBalances, 15000);
-    return () => clearInterval(id);
-  }, [provider, account, loadBalances]);
-
-  /** ---- slippage helper (ES2019 совместимо) ---- */
+  /** ---- slippage helper ---- */
   const applySlippage = (amountOut: bigint) => {
     const bps = BigInt(slippageBps);
     return (amountOut * (BigInt(10000) - bps)) / BigInt(10000);
@@ -125,30 +94,31 @@ export default function ZapBox() {
     if (!provider) return setMsg('Connect wallet');
     setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
       const router = await getRouter();
       const zap    = await getZap(true);
       if (!router || !zap) throw new Error('Router or Zap not ready');
 
-      // общая сумма в wei
-      const totalBNB = parseUnits(bnbAmount || '0', 18);
+      // нормализуем число (заменяем запятую)
+      const amountStr = sanitizeNum(bnbAmount || '0');
+      const totalBNB = parseUnits(amountStr, 18);
       if (totalBNB <= BigInt(0)) throw new Error('Amount must be > 0');
 
       // половина пойдёт на покупку GAD
       const half = totalBNB / BigInt(2);
 
       // оценим GAD аут (WBNB -> GAD) для половины
-      const path = [WBNB_ADDR, GAD_ADDR];
-      const amounts: readonly bigint[] = await router.getAmountsOut(half, path);
-      const expectedGAD = BigInt(amounts[amounts.length - 1].toString());
+      const path = [lc(WBNB_ADDR), lc(GAD_ADDR)];
+      const amounts: any = await router.getAmountsOut(half, path);
+      const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
+      const expectedGAD = BigInt(last.toString());
       const minGad = applySlippage(expectedGAD);
 
       const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
+
       const tx = await zap.zapWithBNB(minGad, BigInt(0), deadline, { value: totalBNB });
       await tx.wait();
       setMsg('Zapped with BNB ✅');
       setBnbAmount('');
-      await loadBalances();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Zap failed');
     } finally {
@@ -166,32 +136,34 @@ export default function ZapBox() {
       const usdt   = await getUsdt(true);
       if (!router || !zap || !usdt) throw new Error('Contracts not ready');
 
-      // у USDT на BSC 18 decimals
-      const amt = parseUnits(usdtAmount || '0', usdtDecimals);
+      // нормализуем число (заменяем запятую)
+      const amt = parseUnits(sanitizeNum(usdtAmount || '0'), 18);
       if (amt <= BigInt(0)) throw new Error('Amount must be > 0');
 
       // approve если не хватает allowance
-      const usdtView = await getUsdt(false);
-      const allowance: bigint = await usdtView!.allowance(account, ZAP_ADDR);
+      const usdtRead = await getUsdt(false);
+      const allowance: bigint = await (usdtRead as any).allowance(account, ZAP_ADDR);
       if (allowance < amt) {
-        const txa = await usdt.approve(ZAP_ADDR, parseUnits('1000000000000', usdtDecimals)); // «практич.∞»
+        const txa = await usdt.approve(ZAP_ADDR, parseUnits('1000000000000', 18)); // «практич.∞»
         await txa.wait();
       }
 
       // половина идёт на покупку GAD (маршрут USDT -> WBNB -> GAD)
       const half = amt / BigInt(2);
-      const path = [USDT_ADDR, WBNB_ADDR, GAD_ADDR];
-      const amounts: readonly bigint[] = await router.getAmountsOut(half, path);
-      const expectedGAD = BigInt(amounts[amounts.length - 1].toString());
+
+      const path = [lc(USDT_ADDR), lc(WBNB_ADDR), lc(GAD_ADDR)];
+      const amounts: any = await router.getAmountsOut(half, path);
+      const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
+      const expectedGAD = BigInt(last.toString());
       const minGad  = applySlippage(expectedGAD);
       const minUSDT = applySlippage(amt - half); // минимум USDT для addLiquidity (вторая половина)
 
       const deadline = Math.floor(Date.now() / 1000) + 600;
+
       const tx = await zap.zapWithUSDT(amt, minGad, minUSDT, deadline);
       await tx.wait();
       setMsg('Zapped with USDT ✅');
       setUsdtAmount('');
-      await loadBalances();
     } catch (e: any) {
       setMsg(e?.shortMessage || e?.message || 'Zap failed');
     } finally {
@@ -203,10 +175,7 @@ export default function ZapBox() {
     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
       <div className="flex items-center justify-between">
         <h3 className="font-bold">One-click Add Liquidity (ZAP)</h3>
-        <button
-          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15"
-          onClick={connect}
-        >
+        <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15" onClick={connect}>
           {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect Wallet'}
         </button>
       </div>
@@ -218,12 +187,11 @@ export default function ZapBox() {
       <div className="mt-4 grid md:grid-cols-2 gap-4">
         {/* ZAP BNB */}
         <div className="bg-black/30 rounded-xl p-4 border border-white/10">
-          <div className="font-semibold mb-1">BNB → GAD/WBNB LP</div>
-          <div className="text-xs text-white/60 mb-2">Wallet: {bnbBalance} BNB</div>
+          <div className="font-semibold mb-2">BNB → GAD/WBNB LP</div>
           <input
             value={bnbAmount}
-            onChange={(e)=>setBnbAmount(e.target.value)}
-            placeholder="Amount BNB"
+            onChange={(e)=>setBnbAmount(sanitizeNum(e.target.value))}
+            placeholder="Amount BNB (e.g. 0.05)"
             className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 outline-none"
             disabled={busy}
           />
@@ -238,12 +206,11 @@ export default function ZapBox() {
 
         {/* ZAP USDT */}
         <div className="bg-black/30 rounded-xl p-4 border border-white/10">
-          <div className="font-semibold mb-1">USDT → GAD/USDT LP</div>
-          <div className="text-xs text-white/60 mb-2">Wallet: {usdtBalance} USDT</div>
+          <div className="font-semibold mb-2">USDT → GAD/USDT LP</div>
           <input
             value={usdtAmount}
-            onChange={(e)=>setUsdtAmount(e.target.value)}
-            placeholder="Amount USDT"
+            onChange={(e)=>setUsdtAmount(sanitizeNum(e.target.value))}
+            placeholder="Amount USDT (e.g. 100)"
             className="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2 outline-none"
             disabled={busy}
           />
