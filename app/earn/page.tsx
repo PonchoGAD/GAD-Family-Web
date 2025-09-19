@@ -2,6 +2,7 @@
 
 import FarmingDashboard from '../components/FarmingDashboard';
 import SwitchNetworkButton from '../components/SwitchNetworkButton';
+import ZapBox from '../components/ZapBox';
 import HowToFarm from '../components/HowToFarm';
 
 export default function Page() {
@@ -16,6 +17,8 @@ export default function Page() {
           Stake LP and earn GAD rewards
         </p>
       </section>
+      {/* ← ZAP-блок */}
+      <ZapBox />
 
       {/* Дашборд сам тянет /api/farming-config на клиенте */}
       <FarmingDashboard />
@@ -25,3 +28,6 @@ export default function Page() {
     </>
   );
 }
+
+
+
