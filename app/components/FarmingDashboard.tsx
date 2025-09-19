@@ -179,11 +179,14 @@ export default function FarmingDashboard() {
 
       {cfg ? (
         <>
+          {/* ОБНОВЛЁННЫЙ заголовок: ясно, что 100B — общий пул */}
           <p className="text-white/70 mt-2">
-            Rewards pool: 100B GAD • Bonus x{cfg.bonusMultiplier} until block {cfg.bonusEndBlock}
+            Total program: 100B GAD • Emissions split by pools (allocPoints) • Bonus x{cfg.bonusMultiplier} until block {cfg.bonusEndBlock}
           </p>
+
           {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
           {/* <GetLpHelp /> */}
+
           <div className="mt-6 grid md:grid-cols-2 gap-6">
             {cfg.pools.map((p) => (
               <PoolCard
@@ -217,6 +220,15 @@ function PoolCard({
   const [amount, setAmount] = React.useState<string>('');
   const [busy, setBusy] = React.useState<boolean>(false);
   const [msg, setMsg] = React.useState<string>('');
+
+  // --- ДОБАВЛЕНО: расчёт доли пула и эмиссии (ничего не ломаем) ---
+  const totalAlloc = (cfg.pools?.reduce((a, b) => a + (b.allocPoint || 0), 0) || 1);
+  const rewardPerBlockBig = BigInt(cfg.rewardPerBlock); // общая эмиссия/блок в wei
+  const poolPerBlockBig   = (rewardPerBlockBig * BigInt(pool.allocPoint)) / BigInt(totalAlloc);
+  const poolPerBlockStr   = formatUnits(poolPerBlockBig, cfg.rewardDecimals);
+  const blocksPerDayBig   = 28800n; // ~3s/block на BSC
+  const perDayBig         = poolPerBlockBig * blocksPerDayBig;
+  const perDayStr         = formatUnits(perDayBig, cfg.rewardDecimals);
 
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
@@ -325,6 +337,11 @@ function PoolCard({
         <a href={pool.pairUrl} target="_blank" rel="noreferrer" className="text-xs text-white/70 hover:underline">
           Add Liquidity
         </a>
+      </div>
+
+      {/* ДОБАВЛЕНО: понятные метрики по эмиссии пула */}
+      <div className="mt-3 text-xs text-white/70">
+        Emission: ~{poolPerBlockStr} GAD / block (~{perDayStr} / day) • Share: {pool.allocPoint}/{totalAlloc}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
