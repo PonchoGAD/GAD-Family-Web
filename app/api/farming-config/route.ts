@@ -17,7 +17,7 @@ export async function GET() {
       {
         id: 0,
         name: "GAD–USDT LP",
-        lpToken: "0xFf74Ed4c41743a2ff1C2e3869E861743cceBf1",
+        lpToken: "0xFf74Ed4c41743a2ff1Cf2e3869E861743cceBf1",
         allocPoint: 70,
         pairUrl:
           "https://pancakeswap.finance/add/0x55d398326f99059fF775485246999027B3197955/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62?chain=bsc"
