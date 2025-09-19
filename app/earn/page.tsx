@@ -1,12 +1,15 @@
+// app/earn/page.tsx
 'use client';
 
-import FarmingDashboard from '../components/FarmingDashboard';
+import dynamic from 'next/dynamic';
 import SwitchNetworkButton from '../components/SwitchNetworkButton';
-import ZapBox from '../components/ZapBox';
-import HowToFarm from '../components/HowToFarm';
 
-export const dynamic = 'force-dynamic';
-export default function Page() {
+// Клиентские компоненты отключаем от SSR
+const FarmingDashboard = dynamic(() => import('../components/FarmingDashboard'), { ssr: false });
+const ZapBox           = dynamic(() => import('../components/ZapBox'),           { ssr: false });
+const HowToFarm        = dynamic(() => import('../components/HowToFarm'),        { ssr: false });
+
+export default function EarnPage() {
   return (
     <>
       <section className="max-w-5xl mx-auto px-4 pt-10">
@@ -15,20 +18,24 @@ export default function Page() {
           <SwitchNetworkButton />
         </div>
         <p className="text-white/70 mt-2">
-          Stake LP and earn GAD rewards
+          Total program: 100B GAD • Emissions split by pools (allocPoints)
         </p>
       </section>
-      {/* ← ZAP-блок */}
-      <ZapBox />
 
-      {/* Дашборд сам тянет /api/farming-config на клиенте */}
-      <FarmingDashboard />
+      {/* Zap-кнопки */}
+      <div className="mt-8">
+        <ZapBox />
+      </div>
 
-      {/* HowToFarm тоже сам подтянет конфиг на клиенте (см. файл ниже) */}
-      <HowToFarm />
+      {/* Дашборд фарминга */}
+      <div className="mt-10">
+        <FarmingDashboard />
+      </div>
+
+      {/* HowToFarm секция */}
+      <div className="mt-10">
+        <HowToFarm />
+      </div>
     </>
   );
 }
-
-
-
