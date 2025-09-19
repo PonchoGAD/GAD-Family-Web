@@ -90,41 +90,53 @@ export default function ZapBox() {
   };
 
   /** ================= ZAP: BNB -> GAD/WBNB ================= */
-  const zapBNB = async () => {
-    if (!provider) return setMsg('Connect wallet');
-    setBusy(true); setMsg('');
+const zapBNB = async () => {
+  if (!provider) return setMsg('Connect wallet');
+  setBusy(true); setMsg('');
+  try {
+    const router = await getRouter();
+    const zap    = await getZap(true);
+    if (!router || !zap) throw new Error('Router or Zap not ready');
+
+    // нормализуем число (заменяем запятую)
+    const amountStr = sanitizeNum(bnbAmount || '0');
+    const totalBNB = parseUnits(amountStr, 18);
+    if (totalBNB <= BigInt(0)) throw new Error('Amount must be > 0');
+
+    const half = totalBNB / BigInt(2);
+
+    // попробуем оценить выход (WBNB -> GAD). Если не выйдет — пойдём без minOut.
+    let minGad: bigint = BigInt(0);
     try {
-      const router = await getRouter();
-      const zap    = await getZap(true);
-      if (!router || !zap) throw new Error('Router or Zap not ready');
-
-      // нормализуем число (заменяем запятую)
-      const amountStr = sanitizeNum(bnbAmount || '0');
-      const totalBNB = parseUnits(amountStr, 18);
-      if (totalBNB <= BigInt(0)) throw new Error('Amount must be > 0');
-
-      // половина пойдёт на покупку GAD
-      const half = totalBNB / BigInt(2);
-
-      // оценим GAD аут (WBNB -> GAD) для половины
       const path = [lc(WBNB_ADDR), lc(GAD_ADDR)];
       const amounts: any = await router.getAmountsOut(half, path);
       const last = Array.isArray(amounts) ? amounts[amounts.length - 1] : amounts.at(-1);
       const expectedGAD = BigInt(last.toString());
-      const minGad = applySlippage(expectedGAD);
+      minGad = applySlippage(expectedGAD);
+    } catch {
+      // оставляем minGad = 0
+    }
 
-      const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
+    const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
 
+    // 1-я попытка: с рассчитанным minGad
+    try {
       const tx = await zap.zapWithBNB(minGad, BigInt(0), deadline, { value: totalBNB });
       await tx.wait();
-      setMsg('Zapped with BNB ✅');
-      setBnbAmount('');
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Zap failed');
-    } finally {
-      setBusy(false);
+    } catch (e1: any) {
+      // Фолбэк: без minOut вообще (защитит от "missing revert data / insufficient output")
+      const tx2 = await zap.zapWithBNB(BigInt(0), BigInt(0), deadline, { value: totalBNB });
+      await tx2.wait();
     }
-  };
+
+    setMsg('Zapped with BNB ✅');
+    setBnbAmount('');
+  } catch (e: any) {
+    setMsg(e?.shortMessage || e?.message || 'Zap failed');
+  } finally {
+    setBusy(false);
+  }
+};
 
   /** ============== ZAP: USDT -> GAD/USDT =================== */
   const zapUSDT = async () => {
