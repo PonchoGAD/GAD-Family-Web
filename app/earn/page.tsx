@@ -5,6 +5,7 @@ import SwitchNetworkButton from '../components/SwitchNetworkButton';
 import ZapBox from '../components/ZapBox';
 import HowToFarm from '../components/HowToFarm';
 
+export const dynamic = 'force-dynamic';
 export default function Page() {
   return (
     <>
