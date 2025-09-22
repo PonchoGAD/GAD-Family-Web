@@ -4,17 +4,17 @@ import React from 'react';
 import { BrowserProvider, Contract, formatUnits, parseUnits } from 'ethers';
 
 // ==== CONFIG ====
-const STAKING_ADDRESS = '0xYOUR_STAKING_ADDRESS'; // адрес GADSingleStakingV2
-const GAD_ADDRESS      = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
-const GAD_DECIMALS     = 18;
-const BSC_CHAIN_ID     = 56;
+const STAKING_ADDRESS = '0x0271167c2b1b1513434ECe38f024434654781594';
+const GAD_ADDRESS     = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
+const GAD_DECIMALS    = 18;
+const BSC_CHAIN_ID    = 56;
 
 // ==== ABIs (минимум) ====
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
   'function balanceOf(address) view returns (uint256)',
   'function allowance(address owner, address spender) view returns (uint256)',
-  'function approve(address spender, uint256 amount) returns (bool)'
+  'function approve(address spender, uint256 amount) returns (bool)',
 ];
 
 const STAKING_ABI = [
@@ -27,13 +27,16 @@ const STAKING_ABI = [
   'function harvest(uint256 pid)',
   'function paused() view returns (bool)',
   'function rewardRateBase() view returns (uint256)',
-  'function programEnd() view returns (uint256)'
+  'function programEnd() view returns (uint256)',
 ];
 
 // ==== helpers ====
 function fmt(n: string | bigint, d = GAD_DECIMALS, max = 6) {
-  try { return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max }); }
-  catch { return '0'; }
+  try {
+    return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max });
+  } catch {
+    return '0';
+  }
 }
 function ts(t: bigint | number) {
   const v = Number(t);
@@ -69,16 +72,37 @@ export default function GADStaking() {
     }
   };
 
+  const switchToBsc = async () => {
+    try {
+      const eth = (window as any).ethereum;
+      if (!eth) return;
+      await eth.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x38' }], // 56
+      });
+      // обновим сеть
+      if (provider) {
+        const net = await provider.getNetwork();
+        setChainId(Number(net.chainId));
+      }
+    } catch (e:any) {
+      // игнор/покажем пользователю
+      setErr(e?.message || 'Cannot switch network');
+    }
+  };
+
   const refresh = React.useCallback(async () => {
     if (!provider) return;
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, provider);
     const len = await staking.poolLength();
     const list:any[] = [];
-    for (let i=0; i<Number(len); i++) {
+    for (let i = 0; i < Number(len); i++) {
       const p = await staking.pools(i);
-      const u = account ? await staking.users(i, account) : { amount:BigInt(0), rewardDebt:BigInt(0), unlockTime:BigInt(0) };
+      const u = account
+        ? await staking.users(i, account)
+        : { amount: BigInt(0), rewardDebt: BigInt(0), unlockTime: BigInt(0) };
       const pend = account ? await staking.pendingReward(i, account) : BigInt(0);
-      list.push({ pid:i, pool:p, user:u, pending:pend });
+      list.push({ pid: i, pool: p, user: u, pending: pend });
     }
     setPools(list);
     setPaused(await staking.paused());
@@ -88,7 +112,7 @@ export default function GADStaking() {
 
   React.useEffect(() => {
     refresh();
-    const id = setInterval(refresh, 15000);
+    const id = setInterval(refresh, 15_000);
     return () => clearInterval(id);
   }, [refresh]);
 
@@ -96,19 +120,31 @@ export default function GADStaking() {
     <section className="max-w-6xl mx-auto px-4 py-10">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl md:text-3xl font-extrabold">GAD Single Staking</h2>
-        <button onClick={connect} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-          {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect'}
-        </button>
+        <div className="flex gap-2">
+          {chainId !== null && chainId !== BSC_CHAIN_ID && (
+            <button onClick={switchToBsc} className="px-3 py-2 rounded-xl border border-white/20 hover:border-white/40">
+              Switch to BNB Chain
+            </button>
+          )}
+          <button onClick={connect} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
+            {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect'}
+          </button>
+        </div>
       </div>
+
       {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
+
       <div className="text-white/70 text-sm mt-2">
-        Chain: {chainId ?? '-'} {chainId!==null && chainId!==BSC_CHAIN_ID && <span className="text-red-400 ml-2">Switch to BNB Chain (56)</span>}
+        Chain: {chainId ?? '-'}
+        {chainId !== null && chainId !== BSC_CHAIN_ID && (
+          <span className="text-red-400 ml-2">Switch to BNB Chain (56)</span>
+        )}
       </div>
       <div className="text-white/70 text-sm">Paused: {paused ? 'Yes' : 'No'} • Program end: {programEnd ? ts(programEnd) : '—'}</div>
       <div className="text-white/70 text-sm mb-6">Base reward rate: {fmt(rateBase)}/sec</div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {pools.map(({pid, pool, user, pending}) => (
+        {pools.map(({ pid, pool, user, pending }) => (
           <PoolCard
             key={pid}
             pid={pid}
@@ -124,14 +160,21 @@ export default function GADStaking() {
   );
 }
 
-function PoolCard({ pid, pool, user, pending, provider, account }:{
-  pid:number; pool:any; user:any; pending:bigint; provider:BrowserProvider|null; account:string;
+function PoolCard({
+  pid, pool, user, pending, provider, account,
+}: {
+  pid: number;
+  pool: any;
+  user: any;
+  pending: bigint;
+  provider: BrowserProvider | null;
+  account: string;
 }) {
   const [gadBal, setGadBal] = React.useState<string>('0');
-  const [allow, setAllow]   = React.useState<string>('0');
-  const [amt, setAmt]       = React.useState<string>('');
-  const [busy, setBusy]     = React.useState<boolean>(false);
-  const [msg, setMsg]       = React.useState<string>('');
+  const [allow,  setAllow]  = React.useState<string>('0');
+  const [amt,    setAmt]    = React.useState<string>('');
+  const [busy,   setBusy]   = React.useState<boolean>(false);
+  const [msg,    setMsg]    = React.useState<string>('');
 
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
@@ -165,12 +208,13 @@ function PoolCard({ pid, pool, user, pending, provider, account }:{
     if (!provider || !amt) return;
     setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
+      const signer  = await provider.getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-      const tx = await staking.deposit(pid, parseUnits(amt, GAD_DECIMALS));
+      const tx = await staking.deposit(pid, parseUnits(amt, GAD_DECIMALS)); // deposit(pid, amount)
       await tx.wait();
       setAmt('');
       setMsg('Staked');
+      await refresh();
     } catch (e:any) {
       setMsg(e?.shortMessage || e?.message || 'Stake failed');
     } finally { setBusy(false); }
@@ -180,12 +224,13 @@ function PoolCard({ pid, pool, user, pending, provider, account }:{
     if (!provider || !amt) return;
     setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
+      const signer  = await provider.getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
       const tx = await staking.withdraw(pid, parseUnits(amt, GAD_DECIMALS));
       await tx.wait();
       setAmt('');
       setMsg('Unstaked');
+      await refresh();
     } catch (e:any) {
       setMsg(e?.shortMessage || e?.message || 'Unstake failed');
     } finally { setBusy(false); }
@@ -195,11 +240,12 @@ function PoolCard({ pid, pool, user, pending, provider, account }:{
     if (!provider) return;
     setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
+      const signer  = await provider.getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
       const tx = await staking.harvest(pid);
       await tx.wait();
       setMsg('Harvested');
+      await refresh();
     } catch (e:any) {
       setMsg(e?.shortMessage || e?.message || 'Harvest failed');
     } finally { setBusy(false); }
@@ -249,7 +295,7 @@ function PoolCard({ pid, pool, user, pending, provider, account }:{
   );
 }
 
-function Stat({label, value}:{label:string; value:string}) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-black/30 rounded-xl p-3 border border-white/10">
       <div className="text-white/60 text-xs">{label}</div>
