@@ -1,19 +1,30 @@
 // app/api/airdrop-proof/route.ts
 import { NextResponse } from "next/server";
-import fs from "fs";
 
-// ВАЖНО: гарантируем Node-runtime (иначе fs недоступен)
+// ВАЖНО: статические импорты включают JSON в серверный бандл.
+// После `npm run airdrop` нужно сделать git add/commit/push этих файлов!
+import rootsJson from "./roots.json";
+import basePackJson from "./base/index.json";
+import bonusPackJson from "./bonus/index.json";
+
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic"; // читать файлы при каждом запросе
+// данные статичны после билда, но оставим dynamic чтобы не кэшировалось CDN
+export const dynamic = "force-dynamic";
 
-function readJsonAdjacent(rel: string) {
-  try {
-    const url = new URL(rel, import.meta.url); // путь рядом с этим файлом
-    const txt = fs.readFileSync(url, "utf8");
-    return JSON.parse(txt);
-  } catch {
-    return null;
-  }
+type Pack = {
+  root: string;
+  count: number;
+  map?: Record<string, { amount: string; amountWei: string; proof: string[] }>;
+};
+
+const ZERO = "0x" + "00".repeat(64);
+
+function getPackSafe(pack: any): Pack {
+  return {
+    root: typeof pack?.root === "string" ? pack.root : ZERO,
+    count: typeof pack?.count === "number" ? pack.count : 0,
+    map: (pack?.map ?? {}) as Pack["map"],
+  };
 }
 
 export async function GET(req: Request) {
@@ -22,52 +33,39 @@ export async function GET(req: Request) {
   const addressRaw = (searchParams.get("address") || "").trim();
   const address = addressRaw.toLowerCase();
 
-  // 1) Только корни
+  const roots = (rootsJson as any) ?? {};
+  const basePack = getPackSafe(basePackJson);
+  const bonusPack = getPackSafe(bonusPackJson);
+
   if (kind === "roots") {
-    const roots = readJsonAdjacent("./roots.json") || {};
     return NextResponse.json(roots);
   }
 
-  // 2) Загружаем base/bonus пакеты (рядом с файлом)
-  const basePack = readJsonAdjacent("./base/index.json");
-  const bonusPack = readJsonAdjacent("./bonus/index.json");
-
-  // 2a) Без адреса — краткая сводка
+  // Без адреса — краткая сводка
   if (!address) {
     return NextResponse.json({
-      base: { root: basePack?.root ?? "0x" + "00".repeat(64), count: basePack?.count ?? 0 },
-      bonus: { root: bonusPack?.root ?? "0x" + "00".repeat(64), count: bonusPack?.count ?? 0 },
+      base: { root: basePack.root, count: basePack.count },
+      bonus: { root: bonusPack.root, count: bonusPack.count },
     });
   }
 
-  // 3) Поиск записи (ключи карты — в lower-case)
-  const baseEntry = basePack?.map?.[address] ?? null;
-  const bonusEntry = bonusPack?.map?.[address] ?? null;
+  const baseEntry = basePack.map?.[address] ?? null;   // ключи в JSON — в lower-case
+  const bonusEntry = bonusPack.map?.[address] ?? null;
 
   if (kind === "base") {
     return NextResponse.json(
-      {
-        root: basePack?.root ?? "0x" + "00".repeat(64),
-        count: basePack?.count ?? 0,
-        address,
-        proof: baseEntry?.proof ?? [],
-      },
+      { root: basePack.root, count: basePack.count, address, proof: baseEntry?.proof ?? [] },
       { status: baseEntry ? 200 : 404 }
     );
   }
   if (kind === "bonus") {
     return NextResponse.json(
-      {
-        root: bonusPack?.root ?? "0x" + "00".repeat(64),
-        count: bonusPack?.count ?? 0,
-        address,
-        proof: bonusEntry?.proof ?? [],
-      },
+      { root: bonusPack.root, count: bonusPack.count, address, proof: bonusEntry?.proof ?? [] },
       { status: bonusEntry ? 200 : 404 }
     );
   }
 
-  // 4) Агрегированный ответ (по умолчанию)
+  // Агрегированный ответ
   const resp = {
     address,
     inBase: !!baseEntry,
@@ -75,8 +73,5 @@ export async function GET(req: Request) {
     baseProof: baseEntry?.proof ?? [],
     bonusProof: bonusEntry?.proof ?? [],
   };
-  if (!resp.inBase && !resp.inBonus) {
-    return NextResponse.json(resp, { status: 404 });
-  }
-  return NextResponse.json(resp);
+  return NextResponse.json(resp, { status: resp.inBase || resp.inBonus ? 200 : 404 });
 }
