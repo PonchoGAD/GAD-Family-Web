@@ -1,116 +1,182 @@
 // scripts/generate-airdrop.mjs
-// Usage: node scripts/generate-airdrop.mjs
-// Input: data/base.csv, data/bonus.csv (одна колонка с адресами, заголовки игнорим)
-// Output: app/api/airdrop-proof/{base,bonus}/index.json (map) + roots.json
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+import { ethers } from "ethers";
 
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-const ROOT = process.cwd();
-const DATA = path.join(ROOT, 'data');
-const OUT  = path.join(ROOT, 'app', 'api', 'airdrop-proof');
+// ---- PATHS ----
+const DECIMALS = 18; // GAD
+const CSV_BASE  = resolve(__dirname, "../data/airdrop/base.csv");
+const CSV_BONUS = resolve(__dirname, "../data/airdrop/bonus.csv");
 
-function isAddr(s) {
-  return /^0x[0-9a-fA-F]{40}$/.test((s||'').trim());
-}
-function norm(s) { return s.trim().toLowerCase(); }
+const OUT_ROOTS = resolve(__dirname, "../app/api/airdrop-proof/roots.json");
+const OUT_BASE  = resolve(__dirname, "../app/api/airdrop-proof/base/index.json");
+const OUT_BONUS = resolve(__dirname, "../app/api/airdrop-proof/bonus/index.json");
 
-// --- простейшее построение меркл-дерева (sorted pairs)
-function keccak(buf) {
-  return '0x' + crypto.createHash('keccak256' in crypto ? 'keccak256' : 'sha3-256') // Node 20 часто sha3-256
-    .update(Buffer.isBuffer(buf) ? buf : Buffer.from(buf.replace(/^0x/,''), 'hex'))
-    .digest('hex');
-}
-// совместим 2 варианта: если нет keccak256, используем sha3-256
-function keccakPacked(a, b) {
-  const A = Buffer.from(a.replace(/^0x/,'') || '', 'hex');
-  const B = Buffer.from(b.replace(/^0x/,'') || '', 'hex');
-  const concat = Buffer.concat([A,B]);
-  const h = crypto.createHash('sha3-256');
-  h.update(concat);
-  return '0x' + h.digest('hex');
+// ---- HELPERS ----
+function cleanCsvText(raw) {
+  if (!raw) return "";
+  // remove BOM
+  return raw.replace(/^\uFEFF/, "");
 }
 
-function leafFromAddress(addr) {
-  // leaf = keccak256(abi.encodePacked(address)) => 20 байт адрес
-  const raw = Buffer.from(addr.replace(/^0x/,'').toLowerCase(),'hex');
-  const h = crypto.createHash('sha3-256'); h.update(raw);
-  return '0x' + h.digest('hex');
+function detectSep(sampleLine) {
+  if (!sampleLine) return ",";
+  const c = (ch) => (sampleLine.split(ch).length - 1);
+  const cand = [
+    { sep: ",", n: c(",") },
+    { sep: ";", n: c(";") },
+    { sep: "\t", n: c("\t") },
+  ];
+  cand.sort((a, b) => b.n - a.n);
+  return cand[0].n > 0 ? cand[0].sep : ",";
 }
 
-function buildTree(leaves) {
-  if (leaves.length === 0) return { root: '0x'+''.padStart(64,'0'), layers: [ [] ] };
-  let layers = [leaves.slice()];
-  while (layers[layers.length - 1].length > 1) {
-    const prev = layers[layers.length - 1];
-    const next = [];
-    for (let i=0; i<prev.length; i+=2) {
-      if (i+1 === prev.length) { next.push(prev[i]); }
-      else {
-        const a = prev[i].toLowerCase();
-        const b = prev[i+1].toLowerCase();
-        const [left, right] = a < b ? [a,b] : [b,a];
-        next.push(keccakPacked(left, right));
-      }
+function splitLine(line, sep) {
+  // простой сплит с удалением кавычек вокруг значений
+  return line.split(sep).map(s => s.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1"));
+}
+
+function parseCsv(path) {
+  let text;
+  try { text = cleanCsvText(readFileSync(path, "utf8")); }
+  catch { return []; }
+
+  const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+  if (rows.length === 0) return [];
+
+  const sep = detectSep(rows[0]);
+  const header = splitLine(rows[0], sep).map(x => x.toLowerCase());
+  let startIdx = 0;
+
+  // есть ли заголовок?
+  const hasHeader = header.includes("address") && header.some(h => h.includes("amount"));
+  if (hasHeader) startIdx = 1;
+
+  const out = [];
+  for (let i = startIdx; i < rows.length; i++) {
+    const cols = splitLine(rows[i], sep);
+    if (cols.length < 2) continue;
+
+    // support any order if header present; otherwise assume address,amount
+    let address = cols[0];
+    let amount  = cols[1];
+    if (hasHeader) {
+      const aIdx = header.indexOf("address");
+      const mIdx = header.findIndex(h => h.includes("amount"));
+      address = cols[aIdx];
+      amount  = cols[mIdx];
     }
-    layers.push(next);
+
+    if (!address || !amount) continue;
+
+    address = address.trim();
+    // Excel может сохранить адрес в верхнем регистре — норм
+    if (!ethers.isAddress(address)) continue;
+
+    // нормализуем amount: убираем пробелы/неразр. пробелы, _; запятая -> точка
+    amount = String(amount).replace(/\s| |_/g, "").replace(",", ".");
+    if (!/^\d+(\.\d+)?$/.test(amount)) continue;
+
+    out.push({ address: ethers.getAddress(address), amount });
   }
-  return { root: layers[layers.length - 1][0], layers };
+  return out;
 }
 
-function getProof(addr, leaves, layers) {
-  // стандартный proof: сосед на каждом уровне
-  let leaf = leafFromAddress(addr);
-  let idx = leaves.findIndex(x => x.toLowerCase() === leaf.toLowerCase());
-  if (idx === -1) return [];
-  const proof = [];
-  for (let l=0; l<layers.length - 1; l++) {
-    const layer = layers[l];
-    const isRight = idx % 2 === 1;
-    const pairIdx = isRight ? idx - 1 : idx + 1;
-    if (pairIdx < layer.length) {
-      proof.push(layer[pairIdx]);
+function leafHash(address, amountWei) {
+  return ethers.solidityPackedKeccak256(["address", "uint256"], [address, amountWei]);
+}
+
+function buildMerkle(leaves) {
+  if (leaves.length === 0) return { root: ethers.ZeroHash, layers: [[]] };
+  let layer = leaves.map(x => x.hash);
+  const layers = [layer];
+
+  while (layer.length > 1) {
+    const next = [];
+    for (let i = 0; i < layer.length; i += 2) {
+      const L = layer[i];
+      const R = (i + 1 < layer.length) ? layer[i + 1] : L;
+      const [a, b] = [L, R].sort();
+      next.push(ethers.keccak256(ethers.concat([a, b])));
     }
+    layer = next;
+    layers.push(layer);
+  }
+  return { root: layer[0], layers };
+}
+
+function getProof(layers, idx) {
+  const proof = [];
+  for (let level = 0; level < layers.length - 1; level++) {
+    const layer = layers[level];
+    const sibIdx = idx ^ 1;
+    const sibling = layer[sibIdx] ?? layer[idx];
+    proof.push(sibling);
     idx = Math.floor(idx / 2);
   }
   return proof;
 }
 
-function readAddresses(csvPath) {
-  if (!fs.existsSync(csvPath)) return [];
-  const raw = fs.readFileSync(csvPath,'utf8');
-  return raw.split(/\r?\n/)
-    .map(l => l.split(',')[0].trim())
-    .filter(a => isAddr(a))
-    .map(norm);
+function writeJson(path, obj) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(obj, null, 2));
 }
 
-function writeJson(p, obj) {
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(obj,null,2));
-}
-
-function runOne(kind) {
-  const csv = path.join(DATA, `${kind}.csv`); // data/base.csv, data/bonus.csv
-  const addrs = readAddresses(csv);
-  if (addrs.length === 0) { console.log(`[${kind}] no addresses`); return null; }
-
-  const leaves = addrs.map(leafFromAddress);
-  const { root, layers } = buildTree(leaves);
-
-  // соберём map: { [address]: { proof: string[] } }
-  const map = {};
-  for (const a of addrs) {
-    map[a] = { proof: getProof(a, leaves, layers) };
+function packSet(items) {
+  // суммируем дубликаты адресов (если вдруг есть)
+  const merged = new Map();
+  for (const { address, amount } of items) {
+    const prev = merged.get(address) || "0";
+    const sum = (Number(prev) + Number(amount)).toString();
+    merged.set(address, sum);
   }
-  writeJson(path.join(OUT, kind, 'index.json'), { root, count: addrs.length, map });
 
-  console.log(`[${kind}] root: ${root} count: ${addrs.length}`);
-  return { kind, root, count: addrs.length };
+  const entries = Array.from(merged.entries()).map(([address, amount]) => {
+    const amountWei = ethers.parseUnits(amount, DECIMALS);
+    const hash = leafHash(address, amountWei);
+    return { address, amount, amountWei: amountWei.toString(), hash };
+  });
+
+  entries.sort((a, b) => (a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0));
+
+  const { root, layers } = buildMerkle(entries);
+  const map = {};
+  entries.forEach((e, i) => {
+    map[e.address.toLowerCase()] = {
+      amount: e.amount,
+      amountWei: e.amountWei,
+      proof: getProof(layers, i),
+    };
+  });
+
+  return { root, count: entries.length, map };
 }
 
-const base = runOne('base');   // ожидает data/base.csv
-const bonus = runOne('bonus'); // ожидает data/bonus.csv
-writeJson(path.join(OUT, 'roots.json'), { base, bonus });
-console.log('Done.');
+function main() {
+  const baseList  = parseCsv(CSV_BASE);
+  const bonusList = parseCsv(CSV_BONUS);
+
+  console.log(`[base] ${baseList.length} addresses`);
+  console.log(`[bonus] ${bonusList.length} addresses`);
+
+  const basePack  = packSet(baseList);
+  const bonusPack = packSet(bonusList);
+
+  writeJson(OUT_ROOTS, {
+    base:  { root: basePack.root,  count: basePack.count },
+    bonus: { root: bonusPack.root, count: bonusPack.count }
+  });
+  writeJson(OUT_BASE,  { root: basePack.root,  count: basePack.count,  map: basePack.map  });
+  writeJson(OUT_BONUS, { root: bonusPack.root, count: bonusPack.count, map: bonusPack.map });
+
+  console.log("Done. Files written:");
+  console.log(" -", OUT_ROOTS);
+  console.log(" -", OUT_BASE);
+  console.log(" -", OUT_BONUS);
+}
+
+main();

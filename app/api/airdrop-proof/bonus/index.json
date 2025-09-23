@@ -1,0 +1,11 @@
+{
+  "root": "0x5b23a1a48885f0d34e6c3650a4c8af54d2f24d3da2286086d27c198ca493426f",
+  "count": 1,
+  "map": {
+    "0x88704df21ac8bfb017ef37b42fc3ba7ce80f61bd": {
+      "amount": "30000",
+      "amountWei": "30000000000000000000000",
+      "proof": []
+    }
+  }
+}
