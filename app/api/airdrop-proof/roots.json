@@ -1,18 +1,10 @@
-import { NextResponse } from 'next/server';
-import base from './base/index.json';
-import bonus from './bonus/index.json';
-import roots from './roots.json';
-
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const kind = searchParams.get('kind') || 'base';
-  const address = (searchParams.get('address') || '').trim().toLowerCase();
-
-  if (kind === 'roots') return NextResponse.json(roots);
-
-  const pack = kind === 'bonus' ? (bonus as any) : (base as any);
-  if (!address) return NextResponse.json({ root: pack.root, count: pack.count, proof: [] });
-
-  const entry = pack.map[address] || null;
-  return NextResponse.json({ root: pack.root, count: pack.count, address, proof: entry?.proof || [] });
+{
+  "base": {
+    "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "count": 0
+  },
+  "bonus": {
+    "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "count": 0
+  }
 }

@@ -1,13 +1,20 @@
 'use client';
 
 import React from 'react';
-import { BrowserProvider, Contract, formatUnits, parseUnits } from 'ethers';
+import {
+  BrowserProvider,
+  JsonRpcProvider,
+  Contract,
+  formatUnits,
+  parseUnits,
+} from 'ethers';
 
 // ==== CONFIG ====
 const STAKING_ADDRESS = '0x0271167c2b1b1513434ECe38f024434654781594';
 const GAD_ADDRESS     = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const GAD_DECIMALS    = 18;
 const BSC_CHAIN_ID    = 56;
+const PUBLIC_BSC_RPC  = 'https://bsc-dataseed.binance.org/';
 
 // ==== ABIs (минимум) ====
 const ERC20_ABI = [
@@ -25,35 +32,33 @@ const STAKING_ABI = [
   'function deposit(uint256 pid, uint256 amount)',
   'function withdraw(uint256 pid, uint256 amount)',
   'function harvest(uint256 pid)',
-  'function paused() view returns (bool)',
-  'function rewardRateBase() view returns (uint256)',
-  'function programEnd() view returns (uint256)',
 ];
 
-// ==== helpers ====
-function fmt(n: string | bigint, d = GAD_DECIMALS, max = 6) {
-  try {
-    return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max });
-  } catch {
-    return '0';
-  }
-}
-function ts(t: bigint | number) {
+const targetLocks = new Set<number>([0, 30 * 86400, 90 * 86400, 180 * 86400]);
+
+// helpers
+const fmt = (n: string | bigint, d = GAD_DECIMALS, max = 6) => {
+  try { return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max }); }
+  catch { return '0'; }
+};
+const ts = (t: bigint | number) => {
   const v = Number(t);
   if (!v) return '-';
-  const dt = new Date(v * 1000);
-  return dt.toLocaleString();
-}
+  return new Date(v * 1000).toLocaleString();
+};
+const cleanNum = (s: string) => (s || '').replace(',', '.').trim();
 
 export default function GADStaking() {
-  const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
+  const [provider, setProvider] = React.useState<BrowserProvider | JsonRpcProvider | null>(null);
   const [account, setAccount]   = React.useState<string>('');
   const [chainId, setChainId]   = React.useState<number | null>(null);
   const [pools, setPools]       = React.useState<any[]>([]);
-  const [paused, setPaused]     = React.useState<boolean>(false);
-  const [programEnd, setProgramEnd] = React.useState<number>(0);
-  const [rateBase, setRateBase] = React.useState<string>('0');
   const [err, setErr]           = React.useState<string>('');
+
+  // создаём read-only провайдер, чтобы пулы были видны без кошелька
+  React.useEffect(() => {
+    if (!provider) setProvider(new JsonRpcProvider(PUBLIC_BSC_RPC));
+  }, [provider]);
 
   const connect = async () => {
     setErr('');
@@ -76,74 +81,74 @@ export default function GADStaking() {
     try {
       const eth = (window as any).ethereum;
       if (!eth) return;
-      await eth.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x38' }], // 56
-      });
-      // обновим сеть
+      await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
       if (provider) {
-        const net = await provider.getNetwork();
+        const net = await (provider as any).getNetwork();
         setChainId(Number(net.chainId));
       }
     } catch (e:any) {
-      // игнор/покажем пользователю
       setErr(e?.message || 'Cannot switch network');
     }
   };
 
   const refresh = React.useCallback(async () => {
     if (!provider) return;
+
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, provider);
-    const len = await staking.poolLength();
-    const list:any[] = [];
-    for (let i = 0; i < Number(len); i++) {
+    const len = Number(await staking.poolLength());
+
+    const temp: any[] = [];
+    for (let i = 0; i < len; i++) {
       const p = await staking.pools(i);
+      const lockSec = Number(p[0]);
+      if (!targetLocks.has(lockSec)) continue; // показываем только 0/30/90/180
+
       const u = account
         ? await staking.users(i, account)
-        : { amount: BigInt(0), rewardDebt: BigInt(0), unlockTime: BigInt(0) };
+        : { amount: BigInt(0), rewardDebt: BigInt(0), unlockTime: BigInt(0)};
       const pend = account ? await staking.pendingReward(i, account) : BigInt(0);
-      list.push({ pid: i, pool: p, user: u, pending: pend });
+
+      temp.push({ pid: i, pool: p, user: u, pending: pend });
     }
-    setPools(list);
-    setPaused(await staking.paused());
-    setRateBase((await staking.rewardRateBase()).toString());
-    setProgramEnd(Number(await staking.programEnd()));
+
+    // сортировка по lockPeriod
+    temp.sort((a, b) => Number(a.pool[0]) - Number(b.pool[0]));
+    setPools(temp);
   }, [provider, account]);
 
   React.useEffect(() => {
     refresh();
-    const id = setInterval(refresh, 15_000);
+    const id = setInterval(refresh, 15000);
     return () => clearInterval(id);
   }, [refresh]);
 
+  const wrongNet = chainId !== null && chainId !== BSC_CHAIN_ID;
+  const walletConnected = !!account;
+  const disabledGlobal = !walletConnected || wrongNet;
+
   return (
-    <section className="max-w-6xl mx-auto px-4 py-10">
+    <section className="max-w-6xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl md:text-3xl font-extrabold">GAD Single Staking</h2>
         <div className="flex gap-2">
-          {chainId !== null && chainId !== BSC_CHAIN_ID && (
+          {wrongNet && (
             <button onClick={switchToBsc} className="px-3 py-2 rounded-xl border border-white/20 hover:border-white/40">
               Switch to BNB Chain
             </button>
           )}
           <button onClick={connect} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15">
-            {account ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect'}
+            {walletConnected ? `${account.slice(0,6)}…${account.slice(-4)}` : 'Connect'}
           </button>
         </div>
       </div>
 
+      <p className="text-white/80 mt-2">
+        Lock <b>0d ×1.0</b> / <b>30d ×1.5</b> / <b>90d ×2.5</b> / <b>180d ×3.5</b>. No LP needed — stake GAD directly.
+      </p>
+
       {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
 
-      <div className="text-white/70 text-sm mt-2">
-        Chain: {chainId ?? '-'}
-        {chainId !== null && chainId !== BSC_CHAIN_ID && (
-          <span className="text-red-400 ml-2">Switch to BNB Chain (56)</span>
-        )}
-      </div>
-      <div className="text-white/70 text-sm">Paused: {paused ? 'Yes' : 'No'} • Program end: {programEnd ? ts(programEnd) : '—'}</div>
-      <div className="text-white/70 text-sm mb-6">Base reward rate: {fmt(rateBase)}/sec</div>
-
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="mt-6 grid md:grid-cols-2 gap-6">
         {pools.map(({ pid, pool, user, pending }) => (
           <PoolCard
             key={pid}
@@ -153,6 +158,7 @@ export default function GADStaking() {
             pending={pending}
             provider={provider}
             account={account}
+            disabledGlobal={disabledGlobal}
           />
         ))}
       </div>
@@ -161,20 +167,23 @@ export default function GADStaking() {
 }
 
 function PoolCard({
-  pid, pool, user, pending, provider, account,
+  pid, pool, user, pending, provider, account, disabledGlobal,
 }: {
   pid: number;
   pool: any;
   user: any;
   pending: bigint;
-  provider: BrowserProvider | null;
+  provider: BrowserProvider | JsonRpcProvider | null;
   account: string;
+  disabledGlobal: boolean;
 }) {
   const [gadBal, setGadBal] = React.useState<string>('0');
   const [allow,  setAllow]  = React.useState<string>('0');
   const [amt,    setAmt]    = React.useState<string>('');
   const [busy,   setBusy]   = React.useState<boolean>(false);
   const [msg,    setMsg]    = React.useState<string>('');
+
+  const disabled = disabledGlobal || busy;
 
   const refresh = React.useCallback(async () => {
     if (!provider || !account) return;
@@ -190,10 +199,10 @@ function PoolCard({
   const needApprove = Number(allow) < Number(amt || '0');
 
   const approveMax = async () => {
-    if (!provider) return;
+    if (!provider || disabled) return;
     setBusy(true); setMsg('');
     try {
-      const signer = await provider.getSigner();
+      const signer = await (provider as BrowserProvider).getSigner();
       const gad = new Contract(GAD_ADDRESS, ERC20_ABI, signer);
       const tx = await gad.approve(STAKING_ADDRESS, parseUnits('1000000000000', GAD_DECIMALS));
       await tx.wait();
@@ -205,12 +214,12 @@ function PoolCard({
   };
 
   const deposit = async () => {
-    if (!provider || !amt) return;
+    if (!provider || disabled || !amt) return;
     setBusy(true); setMsg('');
     try {
-      const signer  = await provider.getSigner();
+      const signer  = await (provider as BrowserProvider).getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-      const tx = await staking.deposit(pid, parseUnits(amt, GAD_DECIMALS)); // deposit(pid, amount)
+      const tx = await staking.deposit(pid, parseUnits(cleanNum(amt), GAD_DECIMALS));
       await tx.wait();
       setAmt('');
       setMsg('Staked');
@@ -221,12 +230,12 @@ function PoolCard({
   };
 
   const withdraw = async () => {
-    if (!provider || !amt) return;
+    if (!provider || disabled || !amt) return;
     setBusy(true); setMsg('');
     try {
-      const signer  = await provider.getSigner();
+      const signer  = await (provider as BrowserProvider).getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
-      const tx = await staking.withdraw(pid, parseUnits(amt, GAD_DECIMALS));
+      const tx = await staking.withdraw(pid, parseUnits(cleanNum(amt), GAD_DECIMALS));
       await tx.wait();
       setAmt('');
       setMsg('Unstaked');
@@ -237,10 +246,10 @@ function PoolCard({
   };
 
   const harvest = async () => {
-    if (!provider) return;
+    if (!provider || disabled) return;
     setBusy(true); setMsg('');
     try {
-      const signer  = await provider.getSigner();
+      const signer  = await (provider as BrowserProvider).getSigner();
       const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, signer);
       const tx = await staking.harvest(pid);
       await tx.wait();
@@ -275,19 +284,27 @@ function PoolCard({
 
       <div className="mt-4 flex gap-2">
         <input
-          className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 outline-none"
+          className="flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 outline-none disabled:opacity-50"
           placeholder="Amount GAD"
           value={amt}
-          onChange={(e)=>setAmt(e.target.value)}
-          disabled={busy}
+          onChange={(e)=>setAmt(cleanNum(e.target.value))}
+          disabled={disabled}
         />
         {needApprove ? (
-          <button onClick={approveMax} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50" disabled={busy}>Approve</button>
+          <button onClick={approveMax} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50" disabled={disabled}>
+            Approve
+          </button>
         ) : (
-          <button onClick={deposit} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50" disabled={busy}>Stake</button>
+          <button onClick={deposit} className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 disabled:opacity-50" disabled={disabled}>
+            Stake
+          </button>
         )}
-        <button onClick={withdraw} className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 disabled:opacity-50" disabled={busy}>Unstake</button>
-        <button onClick={harvest} className="px-4 py-2 rounded-xl bg-[#ffd166] text-black hover:opacity-90 disabled:opacity-50" disabled={busy}>Harvest</button>
+        <button onClick={withdraw} className="px-4 py-2 rounded-xl border border-white/20 hover:border-white/40 disabled:opacity-50" disabled={disabled}>
+          Unstake
+        </button>
+        <button onClick={harvest} className="px-4 py-2 rounded-xl bg-[#ffd166] text-black hover:opacity-90 disabled:opacity-50" disabled={disabled}>
+          Harvest
+        </button>
       </div>
 
       {msg && <div className="mt-2 text-xs text-white/70">{msg}</div>}
