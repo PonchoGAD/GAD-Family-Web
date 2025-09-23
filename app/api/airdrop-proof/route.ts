@@ -1,18 +1,17 @@
 // app/api/airdrop-proof/route.ts
-import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
-export const dynamic = 'force-dynamic'; // не пререндерим, читаем файлы на каждом запросе
+export const dynamic = "force-dynamic"; // читать файлы на каждый запрос
 
 const ROOT = process.cwd();
-const BASE_DIR = path.join(ROOT, 'app', 'api', 'airdrop-proof');
+const BASE_DIR = path.join(ROOT, "app", "api", "airdrop-proof");
 
 function safeReadJson(rel: string) {
   try {
     const p = path.join(BASE_DIR, rel);
-    const txt = fs.readFileSync(p, 'utf8');
-    return JSON.parse(txt);
+    return JSON.parse(fs.readFileSync(p, "utf8"));
   } catch {
     return null;
   }
@@ -20,45 +19,62 @@ function safeReadJson(rel: string) {
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const kind = (searchParams.get('kind') || 'base').toLowerCase(); // 'base' | 'bonus' | 'roots'
-  const address = (searchParams.get('address') || '').trim().toLowerCase();
+  const kind = (searchParams.get("kind") || "all").toLowerCase(); // 'all' | 'roots' | 'base' | 'bonus'
+  const addressRaw = (searchParams.get("address") || "").trim();
+  const address = addressRaw.toLowerCase();
 
-  // сводка корней
-  if (kind === 'roots') {
-    const roots = safeReadJson('roots.json') || {};
+  // 1) Только корни
+  if (kind === "roots") {
+    const roots = safeReadJson("roots.json") || {};
     return NextResponse.json(roots);
   }
 
-  // конкретный пакет (base/bonus)
-  const pack =
-    kind === 'bonus'
-      ? safeReadJson('bonus/index.json')
-      : safeReadJson('base/index.json');
+  // 2) Загрузка пакетов
+  const basePack = safeReadJson("base/index.json");
+  const bonusPack = safeReadJson("bonus/index.json");
 
-  if (!pack) {
-    return NextResponse.json({
-      root: '0x' + '00'.repeat(64),
-      count: 0,
-      proof: [],
-    });
-  }
-
-  // без адреса возвращаем только root + count
+  // 2a) Если адрес не передан — отдать краткую сводку
   if (!address) {
     return NextResponse.json({
-      root: pack.root,
-      count: pack.count,
-      proof: [],
+      base: { root: basePack?.root ?? "0x" + "00".repeat(64), count: basePack?.count ?? 0 },
+      bonus: { root: bonusPack?.root ?? "0x" + "00".repeat(64), count: bonusPack?.count ?? 0 },
     });
   }
 
-  // ищем пруф по адресу (ключи в map — в lower-case)
-  const entry = pack.map?.[address] || null;
+  // 3) Поиск по адресu (ключи в map — в lower-case)
+  const baseEntry = basePack?.map?.[address] || null;
+  const bonusEntry = bonusPack?.map?.[address] || null;
 
-  return NextResponse.json({
-    root: pack.root,
-    count: pack.count,
+  // Позволим запрашивать отдельно kind=base/bonus
+  if (kind === "base") {
+    return NextResponse.json({
+      root: basePack?.root ?? "0x" + "00".repeat(64),
+      count: basePack?.count ?? 0,
+      address,
+      proof: baseEntry?.proof ?? [],
+    }, { status: baseEntry ? 200 : 404 });
+  }
+  if (kind === "bonus") {
+    return NextResponse.json({
+      root: bonusPack?.root ?? "0x" + "00".repeat(64),
+      count: bonusPack?.count ?? 0,
+      address,
+      proof: bonusEntry?.proof ?? [],
+    }, { status: bonusEntry ? 200 : 404 });
+  }
+
+  // 4) Агрегированный ответ (по умолчанию)
+  const resp = {
     address,
-    proof: entry?.proof || [],
-  });
+    inBase: !!baseEntry,
+    inBonus: !!bonusEntry,
+    baseProof: baseEntry?.proof ?? [],
+    bonusProof: bonusEntry?.proof ?? [],
+  };
+
+  // если адрес не найден нигде — 404 (это ожидает фронт)
+  if (!resp.inBase && !resp.inBonus) {
+    return NextResponse.json(resp, { status: 404 });
+  }
+  return NextResponse.json(resp);
 }
