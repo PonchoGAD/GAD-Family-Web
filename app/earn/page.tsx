@@ -3,20 +3,17 @@
 import dynamic from 'next/dynamic';
 import React from 'react';
 
-// существующие виджеты (оставляем как есть)
 const FarmingDashboard = dynamic(() => import('../components/FarmingDashboard'), { ssr: false });
 const ZapBox           = dynamic(() => import('../components/ZapBox'),           { ssr: false });
 const HowToFarm        = dynamic(() => import('../components/HowToFarm'),        { ssr: false });
 
-// добавим мягкую зависимость: если компонент стейкинга есть — отрендерится;
-// если нет — на странице останется только CTA-кнопка.
+// если компонент стейкинга есть — отрендерится; если нет — страница не ломается
 const GADStaking = dynamic(() => import('../components/GADStaking').catch(() => null), { ssr: false });
 
 export default function EarnPage() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-10">
-
-      {/* ==== ШАПКА RAISE/LIQ MINING ==== */}
+      {/* ==== ШАПКА ==== */}
       <h1 className="text-3xl font-extrabold">Liquidity Mining</h1>
       <p className="text-white/70 mt-2">
         Total program: <b>100B GAD</b> • Emissions split by pools (allocPoints)
@@ -34,7 +31,6 @@ export default function EarnPage() {
             0x858bab...FE62
           </a> ✅
         </p>
-
         <p>
           MasterChef (Farming):{' '}
           <a
@@ -45,7 +41,6 @@ export default function EarnPage() {
             0x5C5c0b...F188
           </a> ✅
         </p>
-
         <p>
           Zap Contract:{' '}
           <a
@@ -56,8 +51,6 @@ export default function EarnPage() {
             0x15Acdc...99BC
           </a> ✅
         </p>
-
-        {/* НОВОЕ: single-staking GAD → адрес твоего стейкинг-контракта */}
         <p>
           Staking (single GAD):{' '}
           <a
@@ -70,44 +63,33 @@ export default function EarnPage() {
         </p>
       </div>
 
-      {/* ==== ZAP-КНОПКИ (оставляем) ==== */}
-      <div className="mt-8">
+      {/* ==== GAD SINGLE STAKING (переставлено ВЫШЕ Zap) ==== */}
+      <section className="mt-10 bg-white/5 border border-white/10 rounded-2xl p-6">
+        <h2 className="text-2xl font-bold">Stake GAD → Earn GAD</h2>
+        <p className="text-white/80 mt-2">
+          Lock <b>0d ×1.0</b> / <b>30d ×1.5</b> / <b>90d ×2.5</b> / <b>180d ×3.5</b>. No LP needed — stake GAD directly.
+        </p>
+
+        {GADStaking ? (
+          <div className="mt-6">
+            {/* @ts-ignore: dynamic import may return null at build-time */}
+            <GADStaking />
+          </div>
+        ) : null}
+      </section>
+
+      {/* ==== ZAP ==== */}
+      <div className="mt-10">
         <ZapBox />
       </div>
 
-      {/* ==== ДАШБОРД ФАРМИНГА (оставляем) ==== */}
+      {/* ==== LP FARMING ==== */}
       <div className="mt-10">
         <FarmingDashboard />
       </div>
 
-      {/* ==== СЕКЦИЯ СТЕЙКИНГА GAD → GAD ==== */}
-      <section className="mt-12 bg-white/5 border border-white/10 rounded-2xl p-6">
-        <h2 className="text-2xl font-bold">Stake GAD → Earn GAD</h2>
-        <p className="text-white/80 mt-2">
-          Lock 30 / 90 / 180 days with boosted rewards. No LP needed — stake GAD directly.
-        </p>
-
-        {/* если компонент присутствует — показываем интерфейс прямо тут */}
-        {GADStaking ? (
-          <div className="mt-6">
-            {/* @ts-ignore — динамический импорт может вернуть null */}
-            <GADStaking />
-          </div>
-        ) : null}
-
-        {/* и всегда даём отдельную кнопку на полноценную страницу стейкинга */}
-        <div className="mt-4">
-          <a
-            href="/stake"
-            className="inline-block px-4 py-2 rounded-xl border border-white/20 hover:border-white/40"
-          >
-            Open Staking Page
-          </a>
-        </div>
-      </section>
-
-      {/* ==== ГАЙД (оставляем) ==== */}
-      <div className="mt-10">
+      {/* ==== HOW TO ==== */}
+      <div className="mt-12">
         <HowToFarm />
       </div>
     </main>
