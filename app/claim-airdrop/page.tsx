@@ -7,7 +7,6 @@ import clsx from 'clsx';
 const AIRDROP_ADDR = '0x022cE9320Ea1AB7E03F14D8C0dBD14903A940F79'; // GADAirdropV1
 const BSC_CHAIN_ID = 56;
 
-// минимальный ABI под наш контракт
 const AIRDROP_ABI = [
   'function baseRoot() view returns (bytes32)',
   'function bonusRoot() view returns (bytes32)',
@@ -25,8 +24,8 @@ type ProofResponse = {
   address: string;
   inBase: boolean;
   inBonus: boolean;
-  baseProof: string[];   // bytes32[] в hex
-  bonusProof: string[];  // bytes32[] в hex
+  baseProof: string[];
+  bonusProof: string[];
 };
 
 function fmt(num: bigint, decimals = 18) {
@@ -36,7 +35,7 @@ function fmt(num: bigint, decimals = 18) {
   return frac ? `${int}.${frac}` : int;
 }
 
-// START: 25 Sep 12:00 UTC (month 0-based: Sep=8)
+// START: 25 Sep 12:00 UTC (Sep = 8)
 const CLAIM_START_TS = Date.UTC(2025, 8, 25, 12, 0, 0);
 
 function useCountdown(target: number) {
@@ -54,6 +53,19 @@ function useCountdown(target: number) {
   return `${d}d ${h}h ${m}m ${s}s`;
 }
 
+// FIX: безопасное получение chainId с fallback на net_version
+async function getChainIdSafe(eth: any): Promise<number | null> {
+  try {
+    const hex = await eth.request?.({ method: 'eth_chainId' });
+    if (hex) return parseInt(String(hex), 16);
+  } catch {}
+  try {
+    const id = await eth.request?.({ method: 'net_version' });
+    if (id) return Number(id);
+  } catch {}
+  return null;
+}
+
 export default function ClaimAirdropPage() {
   const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
   const [account, setAccount] = React.useState<string>('');
@@ -61,14 +73,12 @@ export default function ClaimAirdropPage() {
   const [msg, setMsg] = React.useState<string>('');
   const [loading, setLoading] = React.useState<boolean>(false);
 
-  // из контракта
   const [baseAmount, setBaseAmount] = React.useState<bigint | null>(null);
   const [bonusAmount, setBonusAmount] = React.useState<bigint | null>(null);
   const [deadline, setDeadline] = React.useState<number | null>(null);
   const [baseClaimed, setBaseClaimed] = React.useState<boolean>(false);
   const [bonusClaimed, setBonusClaimed] = React.useState<boolean>(false);
 
-  // eligibility + proofs
   const [eligible, setEligible] = React.useState<ProofResponse | null>(null);
 
   const countdown = useCountdown(CLAIM_START_TS);
@@ -78,15 +88,25 @@ export default function ClaimAirdropPage() {
     setMsg('');
     try {
       const eth = (window as any).ethereum;
-      if (!eth) return setMsg('MetaMask not found');
-      const prov = new BrowserProvider(eth);
-      const net = await prov.getNetwork();
-      setChainId(Number(net.chainId));
+      if (!eth) { setMsg('MetaMask not found'); return; }
+
+      // FIX: не используем prov.getNetwork() (внутри ethers вызывает eth_chainId).
+      const prov = new BrowserProvider(eth, 'any');
+      const cid = await getChainIdSafe(eth);
+      setChainId(cid);
+
       const accs = await prov.send('eth_requestAccounts', []);
       setProvider(prov);
       setAccount(accs?.[0] || '');
+
       eth.on?.('accountsChanged', (a: string[]) => setAccount(a?.[0] || ''));
-      eth.on?.('chainChanged', () => window.location.reload());
+      eth.on?.('chainChanged', async () => {
+        const ncid = await getChainIdSafe(eth);
+        setChainId(ncid);
+        // перезагрузим пруфы и ончейн-инфо без полного reload
+        loadOnchainRef.current?.();
+        loadProofsRef.current?.();
+      });
     } catch (e: any) {
       setMsg(e?.message || 'Failed to connect wallet');
     }
@@ -129,6 +149,12 @@ export default function ClaimAirdropPage() {
       setMsg(e?.message || 'Failed to load proof');
     }
   }, [account]);
+
+  // refs, чтобы вызывать после chainChanged
+  const loadOnchainRef = React.useRef<(() => void) | null>(null);
+  const loadProofsRef  = React.useRef<(() => void) | null>(null);
+  loadOnchainRef.current = () => { loadOnchain(); };
+  loadProofsRef.current  = () => { loadProofs(); };
 
   React.useEffect(() => { loadOnchain(); }, [loadOnchain]);
   React.useEffect(() => { loadProofs(); }, [loadProofs]);
