@@ -16,6 +16,9 @@ const GAD_DECIMALS    = 18;
 const BSC_CHAIN_ID    = 56;
 const PUBLIC_BSC_RPC  = 'https://bsc-dataseed.binance.org/';
 
+// >>> Показываем только эти PID
+const VISIBLE_PIDS = new Set<number>([0, 1, 2, 3]);
+
 // ==== ABIs (минимум) ====
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
@@ -33,8 +36,6 @@ const STAKING_ABI = [
   'function withdraw(uint256 pid, uint256 amount)',
   'function harvest(uint256 pid)',
 ];
-
-const targetLocks = new Set<number>([0, 30 * 86400, 90 * 86400, 180 * 86400]);
 
 // helpers
 const fmt = (n: string | bigint, d = GAD_DECIMALS, max = 6) => {
@@ -55,7 +56,7 @@ export default function GADStaking() {
   const [pools, setPools]       = React.useState<any[]>([]);
   const [err, setErr]           = React.useState<string>('');
 
-  // создаём read-only провайдер, чтобы пулы были видны без кошелька
+  // read-only провайдер, чтобы пулы были видны без кошелька
   React.useEffect(() => {
     if (!provider) setProvider(new JsonRpcProvider(PUBLIC_BSC_RPC));
   }, [provider]);
@@ -99,10 +100,10 @@ export default function GADStaking() {
 
     const temp: any[] = [];
     for (let i = 0; i < len; i++) {
-      const p = await staking.pools(i);
-      const lockSec = Number(p[0]);
-      if (!targetLocks.has(lockSec)) continue; // показываем только 0/30/90/180
+      // показываем ТОЛЬКО PID 0,1,2,3
+      if (!VISIBLE_PIDS.has(i)) continue;
 
+      const p = await staking.pools(i);
       const u = account
         ? await staking.users(i, account)
         : { amount: BigInt(0), rewardDebt: BigInt(0), unlockTime: BigInt(0)};
@@ -111,7 +112,7 @@ export default function GADStaking() {
       temp.push({ pid: i, pool: p, user: u, pending: pend });
     }
 
-    // сортировка по lockPeriod
+    // сортировка по lockPeriod, просто для красоты
     temp.sort((a, b) => Number(a.pool[0]) - Number(b.pool[0]));
     setPools(temp);
   }, [provider, account]);
