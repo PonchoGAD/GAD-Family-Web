@@ -1,10 +1,10 @@
 {
   "base": {
-    "root": "0x6988f6abfd170af68f5eecaf75c0cdd7991396ef965e8aa0617971f96d6ca91e",
-    "count": 1
+    "root": "0xd5b8947884309a0102aa20b32c433139ed3833c8082a08658760deaf80d27256",
+    "count": 1224
   },
   "bonus": {
-    "root": "0x5b23a1a48885f0d34e6c3650a4c8af54d2f24d3da2286086d27c198ca493426f",
-    "count": 1
+    "root": "0x36f1291a08fbd3d0dbe4c7fb448b626aa40d482306e4cfa2bf95478ae233fc92",
+    "count": 339
   }
 }
