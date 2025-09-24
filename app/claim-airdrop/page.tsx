@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -114,7 +113,7 @@ export default function ClaimAirdropPage() {
   const [eligible, setEligible] = React.useState<ProofResponse | null>(null);
 
   const countdown = useCountdown(CLAIM_START_TS);
-  const claimOpen = !countdown;
+  const claimOpen = true; // <-- РАЗБЛОКИРОВАЛ: клейм всегда открыт
 
   const connect = async () => {
     setMsg('');
@@ -313,30 +312,30 @@ export default function ClaimAirdropPage() {
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             onClick={claimBase}
-            disabled={loading || wrongNet || !claimOpen || !canClaimBase}
+            disabled={loading || wrongNet || !canClaimBase}
             className={clsx(
               'px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15',
-              (loading || wrongNet || !claimOpen || !canClaimBase) && 'opacity-50 cursor-not-allowed'
+              (loading || wrongNet || !canClaimBase) && 'opacity-50 cursor-not-allowed'
             )}
           >
             Claim Base
           </button>
           <button
             onClick={claimBonus}
-            disabled={loading || wrongNet || !claimOpen || !canClaimBonus}
+            disabled={loading || wrongNet || !canClaimBonus}
             className={clsx(
               'px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15',
-              (loading || wrongNet || !claimOpen || !canClaimBonus) && 'opacity-50 cursor-not-allowed'
+              (loading || wrongNet || !canClaimBonus) && 'opacity-50 cursor-not-allowed'
             )}
           >
             Claim Bonus
           </button>
           <button
             onClick={claimBoth}
-            disabled={loading || wrongNet || !claimOpen || !canClaimBoth}
+            disabled={loading || wrongNet || !canClaimBoth}
             className={clsx(
               'px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90',
-              (loading || wrongNet || !claimOpen || !canClaimBoth) && 'opacity-50 cursor-not-allowed'
+              (loading || wrongNet || !canClaimBoth) && 'opacity-50 cursor-not-allowed'
             )}
           >
             Claim Both
