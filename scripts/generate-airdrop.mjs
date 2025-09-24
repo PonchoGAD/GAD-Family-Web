@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // ---- PATHS ----
-const DECIMALS = 18; // GAD
+const DECIMALS = 18; // GAD (оставляем, но в хеше больше не используем)
 const CSV_BASE  = resolve(__dirname, "../data/airdrop/base.csv");
 const CSV_BONUS = resolve(__dirname, "../data/airdrop/bonus.csv");
 
@@ -37,23 +37,28 @@ function detectSep(sampleLine) {
 
 function splitLine(line, sep) {
   // простой сплит с удалением кавычек вокруг значений
-  return line.split(sep).map(s => s.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1"));
+  return line
+    .split(sep)
+    .map((s) => s.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1"));
 }
 
 function parseCsv(path) {
   let text;
-  try { text = cleanCsvText(readFileSync(path, "utf8")); }
-  catch { return []; }
+  try {
+    text = cleanCsvText(readFileSync(path, "utf8"));
+  } catch {
+    return [];
+  }
 
-  const rows = text.split(/\r?\n/).map(r => r.trim()).filter(Boolean);
+  const rows = text.split(/\r?\n/).map((r) => r.trim()).filter(Boolean);
   if (rows.length === 0) return [];
 
   const sep = detectSep(rows[0]);
-  const header = splitLine(rows[0], sep).map(x => x.toLowerCase());
+  const header = splitLine(rows[0], sep).map((x) => x.toLowerCase());
   let startIdx = 0;
 
   // есть ли заголовок?
-  const hasHeader = header.includes("address") && header.some(h => h.includes("amount"));
+  const hasHeader = header.includes("address") && header.some((h) => h.includes("amount"));
   if (hasHeader) startIdx = 1;
 
   const out = [];
@@ -66,7 +71,7 @@ function parseCsv(path) {
     let amount  = cols[1];
     if (hasHeader) {
       const aIdx = header.indexOf("address");
-      const mIdx = header.findIndex(h => h.includes("amount"));
+      const mIdx = header.findIndex((h) => h.includes("amount"));
       address = cols[aIdx];
       amount  = cols[mIdx];
     }
@@ -86,20 +91,21 @@ function parseCsv(path) {
   return out;
 }
 
-function leafHash(address, amountWei) {
-  return ethers.solidityPackedKeccak256(["address", "uint256"], [address, amountWei]);
+// >>> Лист только по адресу (контракт проверяет адрес, не сумму)
+function leafHash(address) {
+  return ethers.solidityPackedKeccak256(["address"], [address]);
 }
 
 function buildMerkle(leaves) {
   if (leaves.length === 0) return { root: ethers.ZeroHash, layers: [[]] };
-  let layer = leaves.map(x => x.hash);
+  let layer = leaves.map((x) => x.hash);
   const layers = [layer];
 
   while (layer.length > 1) {
     const next = [];
     for (let i = 0; i < layer.length; i += 2) {
       const L = layer[i];
-      const R = (i + 1 < layer.length) ? layer[i + 1] : L;
+      const R = i + 1 < layer.length ? layer[i + 1] : L;
       const [a, b] = [L, R].sort();
       next.push(ethers.keccak256(ethers.concat([a, b])));
     }
@@ -127,7 +133,7 @@ function writeJson(path, obj) {
 }
 
 function packSet(items) {
-  // суммируем дубликаты адресов (если вдруг есть)
+  // суммируем дубликаты адресов (если вдруг есть) — сумму оставляем только для инфо
   const merged = new Map();
   for (const { address, amount } of items) {
     const prev = merged.get(address) || "0";
@@ -136,19 +142,18 @@ function packSet(items) {
   }
 
   const entries = Array.from(merged.entries()).map(([address, amount]) => {
-    const amountWei = ethers.parseUnits(amount, DECIMALS);
-    const hash = leafHash(address, amountWei);
-    return { address, amount, amountWei: amountWei.toString(), hash };
+    const hash = leafHash(address); // <<< только адрес в хеше
+    return { address, amount, hash };
   });
 
+  // сортируем по хешу (стабильно)
   entries.sort((a, b) => (a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0));
 
   const { root, layers } = buildMerkle(entries);
   const map = {};
   entries.forEach((e, i) => {
     map[e.address.toLowerCase()] = {
-      amount: e.amount,
-      amountWei: e.amountWei,
+      amount: e.amount,     // информативно (не участвует в верификации)
       proof: getProof(layers, i),
     };
   });
@@ -168,7 +173,7 @@ function main() {
 
   writeJson(OUT_ROOTS, {
     base:  { root: basePack.root,  count: basePack.count },
-    bonus: { root: bonusPack.root, count: bonusPack.count }
+    bonus: { root: bonusPack.root, count: bonusPack.count },
   });
   writeJson(OUT_BASE,  { root: basePack.root,  count: basePack.count,  map: basePack.map  });
   writeJson(OUT_BONUS, { root: bonusPack.root, count: bonusPack.count, map: bonusPack.map });
