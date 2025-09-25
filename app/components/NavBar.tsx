@@ -12,6 +12,12 @@ export default function NavBar() {
 
         {/* Навигация */}
         <div className="flex items-center gap-6">
+          <Link
+            href="/claim-airdrop"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-x1 bg-[#ffd166] text-[#0b0f17] font-semibold hover: opacity-90"
+            >
+              Claim
+            </Link>
           {/* Airdrop */}
           <Link
             href="/airdrop"
