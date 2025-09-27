@@ -1,8 +1,5 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-
-// Клиентский таймер подключаем динамически (без SSR)
-const Countdown = dynamic(() => import('../components/Countdown'), { ssr: false });
+import Countdown from '../components/Countdown'; // <-- просто прямой импорт клиентского компонента, без dynamic
 
 export const metadata: Metadata = {
   title: 'GAD — Airdrop',
@@ -116,13 +113,17 @@ function WinnersList({
 export default async function AirdropPage() {
   const claimStartIso = '2025-09-25T12:00:00Z';
 
-  // Берём пакеты напрямую с бэкенда, чтобы всегда были актуальны
+  // Берём пакеты напрямую с бэкенда
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_ORIGIN ??
+    (typeof window === 'undefined' ? '' : window.location.origin);
+
   const [basePack, bonusPack] = await Promise.all([
-    fetch(`${process.env.NEXT_PUBLIC_SITE_ORIGIN ?? ''}/api/airdrop-proof?kind=base`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
+    fetch(`${origin}/api/airdrop-proof?kind=base`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
       .catch(() => null),
-    fetch(`${process.env.NEXT_PUBLIC_SITE_ORIGIN ?? ''}/api/airdrop-proof?kind=bonus`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null)
+    fetch(`${origin}/api/airdrop-proof?kind=bonus`, { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
       .catch(() => null),
   ]);
 
