@@ -1,0 +1,35 @@
+{
+  "name": "gad-nft-contracts",
+  "version": "1.0.0",
+  "private": "true",
+  "type": "module",
+  "scripts": {
+    "clean": "hardhat clean",
+    "compile": "hardhat compile",
+    "abi": "ts-node --transpile-only scripts/export-abi.ts",
+    "build": "npm run clean && npm run compile && npm run abi",
+    "verify": "ts-node --transpile-only scripts/verify.ts",
+    "grant-minter": "ts-node --transpile-only scripts/deploy.mainnet.ts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
+    "@nomicfoundation/hardhat-ethers": "^4.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@nomicfoundation/hardhat-verify": "^3.0.0",
+    "@types/node": "^20.14.12",
+    "dotenv": "^16.6.1",
+    "ethers": "^6.13.2",
+    "hardhat": "^3.0.6",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.6"
+  },
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

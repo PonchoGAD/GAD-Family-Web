@@ -1,0 +1,39 @@
+{
+  "_format": "hh3-artifact-1",
+  "contractName": "ILiquidityVaultLike",
+  "sourceName": "src/Marketplace.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "depositBNB",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "depositToken",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {},
+  "immutableReferences": {},
+  "inputSourceName": "project/src/Marketplace.sol",
+  "buildInfoId": "solc-0_8_24-a9c253e7292f9857ab4ecda4a3cdad80ad94a58c"
+}

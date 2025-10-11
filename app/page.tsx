@@ -448,7 +448,7 @@ function Tokenomics(): ReactElement {
                   outerRadius={115}
                   paddingAngle={2}
                   labelLine={false}
-                  label={({ percent }) => `${Math.round(percent * 100)}%`}
+                  label={({ percent }) => `${Math.round(Number(percent) * 100)}%`}
                 >
                   {data.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

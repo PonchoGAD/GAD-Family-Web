@@ -1,0 +1,3 @@
+/* базовые стили для nft-раздела, если вдруг не используешь tailwind */
+.nft-card { border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
+.nft-card img { display:block; width:100%; border-bottom: 1px solid rgba(255,255,255,0.1); }
