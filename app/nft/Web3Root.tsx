@@ -1,8 +1,10 @@
 "use client";
-
-import "./web3modal-init";   // один раз инициализирует Web3Modal на клиенте
-import { Providers } from "./wagmi";
+import { useEffect } from "react";
+import { WagmiProvider } from "./wagmi";
+import { initWeb3ModalOnce } from "./safe-web3";
 
 export default function Web3Root({ children }: { children: React.ReactNode }) {
-  return <Providers>{children}</Providers>;
+  useEffect(() => { initWeb3ModalOnce(); }, []);
+  return <WagmiProvider>{children}</WagmiProvider>;
 }
+ 

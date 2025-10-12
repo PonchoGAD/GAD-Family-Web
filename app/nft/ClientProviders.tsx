@@ -1,6 +1,5 @@
 "use client";
 
-import "./web3modal-init"; // <-- важно: прогреет Web3Modal до хуков
 import React from "react";
 import Web3Providers from "./web3-provider";
 
