@@ -1,27 +1,23 @@
 "use client";
 
 import { createWeb3Modal } from "@web3modal/wagmi/react";
-import { wagmiConfig } from "./wagmi";
+import { wagmiConfig, projectId } from "./wagmi";
 
-// Прочитает ID из .env
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_ID ?? "";
-
-// Глобальный флаг, чтобы не инициализировать повторно при HMR/Навигации
 declare global {
-  interface Window { __W3M_INITIALIZED__?: boolean }
+  interface Window {
+    __WEB3MODAL_INIT__?: boolean;
+  }
 }
 
-if (typeof window !== "undefined" && !window.__W3M_INITIALIZED__) {
+if (typeof window !== "undefined" && !window.__WEB3MODAL_INIT__) {
   if (!projectId) {
-    // Можно тихо не инициализировать, чтобы не падать на билде без ключа
-    console.warn("WalletConnect ProjectId is empty (NEXT_PUBLIC_WALLETCONNECT_ID). Web3Modal not initialized.");
+    console.warn("Missing NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID");
   } else {
     createWeb3Modal({
       wagmiConfig,
       projectId,
-      enableAnalytics: false,
-      themeMode: "dark"
+      enableAnalytics: false
     });
-    window.__W3M_INITIALIZED__ = true;
   }
+  window.__WEB3MODAL_INIT__ = true;
 }

@@ -1,11 +1,16 @@
+// app/nft/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import NFTHomeClient from "./HomeClient";
+import ClientOnly from "./components/ClientOnly";
 
 export const metadata: Metadata = {
   title: "GAD — NFT Marketplace",
   description: "Explore, buy and sell NFTs on BNB Chain.",
 };
+
+// запрещаем SSR/пререндер, чтобы на сервере не исполнялись web3-хуки
+export const dynamic = "force-dynamic";
 
 export default function NFTPage() {
   return (
@@ -60,8 +65,10 @@ export default function NFTPage() {
         </div>
       </section>
 
-      {/* your existing HomeClient unchanged */}
-      <NFTHomeClient />
+      {/* ВАЖНО: web3-хуки — только внутри ClientOnly */}
+      <ClientOnly>
+        <NFTHomeClient />
+      </ClientOnly>
 
       {/* FAQ */}
       <section className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-6">

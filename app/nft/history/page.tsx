@@ -1,11 +1,14 @@
-// app/nft/history/page.tsx
+import type { Metadata } from "next";
+import ClientOnly from "../components/ClientOnly";
 import HistoryClient from "./HistoryClient";
 
-// отключаем SSR/кэш, чтобы сервер не выполнял клиентские хуки
+export const metadata: Metadata = { title: "NFT History" };
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
-export const fetchCache = "default-no-store";
 
-export default function HistoryPage() {
-  return <HistoryClient />;
+export default function Page() {
+  return (
+    <ClientOnly>
+      <HistoryClient />
+    </ClientOnly>
+  );
 }
