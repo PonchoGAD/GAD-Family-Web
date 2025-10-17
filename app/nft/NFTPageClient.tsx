@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 // грузим кнопку кошелька ТОЛЬКО на клиенте
-const WalletConnect = dynamic(() => import("../components/WalletConnect"), { ssr: false });
+const WalletConnect = dynamic(() => import("../components/WalletConnectButton"), { ssr: false });
 
 export default function NFTPageClient() {
   return (

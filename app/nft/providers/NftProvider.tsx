@@ -1,25 +1,13 @@
+// app/nft/providers/NftProvider.tsx
 "use client";
 
-import { WagmiProvider } from "wagmi";
-import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
-import { wagmiConfig } from "../wagmi";
-import { useEffect } from "react";
-import { initWeb3ModalOnce } from "../safe-web3";
+// ВАЖНО: раньше тут был WagmiProvider, теперь — тонкий провайдер без зависимостей.
+// Чтобы ничего не падало и импорты не переписывать, мы оставляем то же имя экспорта.
 
-const queryClient = new QueryClient();
+import React from "react";
 
 export default function NftProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    try {
-      initWeb3ModalOnce();
-    } catch (e) {
-      console.warn("⚠️ Web3Modal init failed", e);
-    }
-  }, []);
-
-  return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </WagmiProvider>
-  );
+  // Ничего не делаем: просто рендерим детей.
+  // Весь функционал подключения кошелька теперь в наших лёгких хуках (ethers).
+  return <>{children}</>;
 }
