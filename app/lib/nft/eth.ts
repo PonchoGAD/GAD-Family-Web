@@ -1,18 +1,18 @@
-import { ethers } from "ethers";
-import { RPC_URL } from "./constants";
+import { BrowserProvider, JsonRpcProvider } from "ethers";
+import { DEFAULT_CHAIN } from "./chains";
 
-export function getReadProvider() {
-  if (!RPC_URL) throw new Error("RPC_URL is empty");
-  return new ethers.JsonRpcProvider(RPC_URL);
-}
+export const getReadProvider = async () => {
+  return new JsonRpcProvider(DEFAULT_CHAIN.rpc);
+};
 
-export async function getBrowserProvider() {
-  const eth = (globalThis as any)?.ethereum;
-  if (!eth) throw new Error("Ethereum provider not found");
-  return new ethers.BrowserProvider(eth);
-}
+export const getBrowserProvider = async () => {
+  if (typeof window === "undefined") throw new Error("No window");
+  const anyWin = window as any;
+  if (!anyWin.ethereum) throw new Error("Wallet is not available");
+  return new BrowserProvider(anyWin.ethereum, "any");
+};
 
-export async function getSigner() {
-  const p = await getBrowserProvider();
-  return p.getSigner();
-}
+export const getSigner = async () => {
+  const provider = await getBrowserProvider();
+  return await provider.getSigner();
+};

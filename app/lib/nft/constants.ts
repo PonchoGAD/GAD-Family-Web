@@ -1,20 +1,15 @@
-// app/lib/nft/constants.ts
-// финальная сборка конфигурации из .env + config.ts
+export const APP = {
+  NAME: "GAD Family NFT",
+  VERSION: "1.0.0",
+  NETWORK: "BSC Mainnet",
+};
 
-import { config } from "./config";
+export const LIMITS = {
+  MAX_IMAGE_SIZE_MB: 15,
+  MINT_FEE_MIN: 0.001, // BNB
+};
 
-export const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? config.RPC_URL;
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? config.CHAIN_ID);
-export const START_BLOCK = Number(process.env.NEXT_PUBLIC_START_BLOCK ?? config.START_BLOCK);
-
-export const ADDR = {
-  NFT721: process.env.NEXT_PUBLIC_NFT721 ?? config.ADDR.NFT721,
-  MARKETPLACE: process.env.NEXT_PUBLIC_MARKETPLACE ?? config.ADDR.MARKETPLACE,
-  USDT: process.env.NEXT_PUBLIC_USDT ?? config.ADDR.USDT,
-  LIQUIDITY_VAULT: process.env.NEXT_PUBLIC_LIQUIDITY_VAULT ?? config.ADDR.LIQUIDITY_VAULT,
-} as const;
-
-export const EXPLORER_TX = process.env.NEXT_PUBLIC_EXPLORER_TX ?? config.EXPLORER_TX;
-
-const _compat = { RPC_URL, CHAIN_ID, START_BLOCK, ADDR, EXPLORER_TX };
-export default _compat;
+export const COLORS = {
+  primary: "#D4AF37",
+  bg: "#0E0E12",
+};

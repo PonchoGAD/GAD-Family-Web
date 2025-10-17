@@ -1,9 +1,12 @@
-// app/nft/layout.tsx
 import type { Metadata } from "next";
-export const metadata: Metadata = { title: "GAD NFT" };
+import NftProvider from "./providers/NftProvider";
 
-import ClientLayout from "./Web3Root"; // клиентский корень
+export const metadata: Metadata = {
+  title: "GAD — NFT",
+  description: "NFT features for GAD",
+};
 
 export default function NftLayout({ children }: { children: React.ReactNode }) {
-  return <ClientLayout>{children}</ClientLayout>;
+  // Серверный layout → рендерит клиентский провайдер (внутри уже есть "use client")
+  return <NftProvider>{children}</NftProvider>;
 }

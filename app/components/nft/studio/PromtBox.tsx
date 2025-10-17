@@ -1,18 +1,37 @@
 "use client";
+
 import { useState } from "react";
 
-export default function PromptBox({ onSubmit }: { onSubmit: (p: string) => void }) {
-  const [prompt, setPrompt] = useState("");
+export default function PromptBox({
+  onGenerate,
+  disabled,
+}: {
+  onGenerate: (prompt: string) => void;
+  disabled?: boolean;
+}) {
+  const [text, setText] = useState("");
+
+  const submit = () => {
+    if (!text.trim()) return;
+    onGenerate(text.trim());
+  };
+
   return (
-    <div className="flex gap-2">
-      <input
-        className="border p-2 rounded w-full"
-        placeholder="Describe your NFT artwork…"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
+    <div className="border rounded p-3 bg-[#0E0E12]/70 text-white">
+      <div className="font-semibold mb-2">AI Image Generator</div>
+      <textarea
+        className="w-full bg-transparent border rounded p-2 text-sm"
+        rows={3}
+        placeholder="Describe your NFT idea (e.g. ‘golden guardian under aurora sky’)"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
       />
-      <button className="border px-3 py-2 rounded" onClick={() => onSubmit(prompt)}>
-        Generate
+      <button
+        onClick={submit}
+        disabled={disabled}
+        className="mt-2 border border-mint-400 text-mint-300 rounded px-4 py-2 hover:bg-mint-400 hover:text-black transition"
+      >
+        {disabled ? "Generating…" : "Generate Image"}
       </button>
     </div>
   );

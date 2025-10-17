@@ -1,0 +1,15 @@
+// app/nft/upload/page.tsx
+import type { Metadata } from "next";
+import ClientOnly from "../components/_ClientOnly";
+import UploadMintClient from "./_UploadMintClient";
+
+export const metadata: Metadata = { title: "Upload & Mint" };
+export const dynamic = "force-dynamic";
+
+export default function Page() {
+  return (
+    <ClientOnly>
+      <UploadMintClient />
+    </ClientOnly>
+  );
+}

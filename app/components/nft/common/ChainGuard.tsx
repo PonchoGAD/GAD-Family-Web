@@ -1,44 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useChainId, useSwitchChain } from "wagmi";
+import { useEffect, useState } from "react";
+import { DEFAULT_CHAIN } from "../../../lib/nft/chains";
 
-// Читаем ожидаемую сеть из env (клиентская!)
-const EXPECTED_CHAIN_ID =
-  Number(process.env.NEXT_PUBLIC_CHAIN_ID || "56"); // BSC Mainnet по умолчанию
-const EXPECTED_CHAIN_NAME =
-  process.env.NEXT_PUBLIC_CHAIN_NAME || "BNB Smart Chain";
+export default function ChainGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [ok, setOk] = useState(true);
 
-export default function ChainGuard({ children }: { children: React.ReactNode }) {
-  const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
-  const [supported, setSupported] = useState(true);
-
-  // Если switchChain не поддержан (например, кошелёк не даёт), прячем кнопку
   useEffect(() => {
-    setSupported(!!switchChain);
-  }, [switchChain]);
+    const anyWin = window as any;
+    const eth = anyWin?.ethereum;
+    if (!eth) return;
 
-  const ok = useMemo(() => {
-    if (!chainId) return true; // до коннекта — не мешаем рендеру
-    return chainId === EXPECTED_CHAIN_ID;
-  }, [chainId]);
+    const check = async () => {
+      try {
+        const chainHex = await eth.request({ method: "eth_chainId" });
+        const current = parseInt(chainHex, 16);
+        setOk(current === DEFAULT_CHAIN.id);
+      } catch {
+        setOk(true);
+      }
+    };
+
+    check();
+    eth?.on?.("chainChanged", check);
+    return () => eth?.removeListener?.("chainChanged", check);
+  }, []);
 
   if (!ok) {
     return (
       <div className="p-4 border rounded bg-yellow-50 text-yellow-900">
-        <div className="font-semibold mb-1">Wrong network</div>
-        <div className="text-sm mb-2">
-          Please switch to <b>{EXPECTED_CHAIN_NAME}</b> (chainId {EXPECTED_CHAIN_ID}).
-        </div>
-        {supported ? (
-          <button
-            onClick={() => switchChain?.({ chainId: EXPECTED_CHAIN_ID })}
-            className="border px-3 py-2 rounded"
-          >
-            Switch in wallet
-          </button>
-        ) : null}
+        You are connected to a wrong network. Please switch to <b>{DEFAULT_CHAIN.name}</b>.
       </div>
     );
   }

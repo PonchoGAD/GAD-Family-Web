@@ -1,43 +1,73 @@
 "use client";
-import React from "react";
-import NFTCard from "../../../nft/components/NFTCard";
 
-export default function ProfileClient({ wallet }:{ wallet:string }) {
-  const [rows, setRows] = React.useState<any[]>([]);
-  const [cursor, setCursor] = React.useState<number|null>(null);
-  const [loading, setLoading] = React.useState(false);
+import React, { useEffect, useState } from "react";
+import NftCard from "../../../components/nft/market/NftCard";
+import { useParams } from "next/navigation";
+import { getReadProvider } from "../../../lib/nft/eth";
+import { nft721Abi } from "../../../lib/nft/abis/nft721";
+import { ethers } from "ethers";
 
-  const load = async (c?:number|null) => {
-    setLoading(true);
-    try {
-      const qs = new URLSearchParams();
-      qs.set("limit", "100");
-      qs.set("seller", wallet);
-      if (c) qs.set("cursor", String(c));
-      const r = await fetch(`/nft/api/index?${qs.toString()}`, { cache: "no-store" });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j?.error || "failed");
-      setRows(prev => [...prev, ...(j.items||[])]);
-      setCursor(j.nextCursor);
-    } finally { setLoading(false); }
-  };
+export default function ProfileClient() {
+  const { wallet } = useParams() as { wallet: string };
+  const [owned, setOwned] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(()=>{ load(null); }, [wallet]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const provider = await getReadProvider();
+
+        // ⚠️ Здесь должен быть контракт NFT — временно используем ADDR.NFT721
+        const NFT_CONTRACT = process.env.NEXT_PUBLIC_NFT721_ADDRESS;
+        if (!NFT_CONTRACT) {
+          console.error("❌ Missing NEXT_PUBLIC_NFT721_ADDRESS in .env.local");
+          return;
+        }
+
+        const contract = new ethers.Contract(NFT_CONTRACT, nft721Abi, provider);
+        const logs = await contract.queryFilter("Transfer", 0, "latest");
+
+        const nfts = logs
+          .map((l) => (l as any).args)
+          .filter((a) => a?.to?.toLowerCase() === wallet.toLowerCase())
+          .map((a) => ({
+            tokenId: a?.tokenId?.toString(),
+            owner: a?.to,
+          }));
+
+        setOwned(nfts);
+      } catch (err) {
+        console.error("⚠️ Error loading NFTs:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [wallet]);
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">Listings by {wallet.slice(0,6)}…{wallet.slice(-4)}</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {rows.map((r:any)=>(
-          <NFTCard key={`${r.txHash}-${r.tokenId}`} nft={r.nft} tokenId={r.tokenId}
-                   currency={r.currency} price={r.price} seller={r.seller}/>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <button className="px-3 py-2 rounded border border-white/10"
-                disabled={!cursor || loading}
-                onClick={()=>load(cursor)}>Load more</button>
-      </div>
-    </div>
+    <main className="p-6">
+      <h1 className="text-3xl font-bold mb-6 text-white">Your NFTs</h1>
+
+      {loading ? (
+        <div className="text-gray-400 text-center mt-12">Loading...</div>
+      ) : owned.length ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {owned.map((nft, i) => (
+            <NftCard
+              key={i}
+              nft={process.env.NEXT_PUBLIC_NFT721_ADDRESS || ""}
+              seller={nft.owner}
+              tokenId={nft.tokenId}
+              price={"0"}
+              currency={ethers.ZeroAddress}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-gray-400 text-center mt-12">
+          You don't own any NFTs yet.
+        </div>
+      )}
+    </main>
   );
 }

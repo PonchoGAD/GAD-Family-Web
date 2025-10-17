@@ -1,55 +1,52 @@
 "use client";
-import React from "react";
+
+import { useState } from "react";
+import { buyItem } from "../../../lib/nft/sdk";
 import { ethers } from "ethers";
-import { getBrowserProvider } from "../../../lib/nft/eth";
-import { getMarketplaceContract, getUsdtContract } from "../../../lib/nft/contracts";
-import { ADDR } from "../../../lib/nft/constants";
+import { DEFAULT_CHAIN } from "../../../lib/nft/chains";
+import TxToast from "../common/TxToast";
 
-export default function BuyNowButton(props: {
-  nft: string; tokenId: string; currency: string; price: string; className?: string
+export default function BuyNowButton({
+  nft,
+  tokenId,
+  seller,
+  currency,
+  priceWei,
+}: {
+  nft: string;
+  tokenId: string;
+  seller: string;
+  currency: "BNB" | "USDT";
+  priceWei: bigint;
 }) {
-  const { nft, tokenId, currency, price, className } = props;
-  const [busy, setBusy] = React.useState(false);
-  const isUSDT = currency.toLowerCase() === ADDR.USDT.toLowerCase();
+  const [busy, setBusy] = useState(false);
+  const [hash, setHash] = useState<string | null>(null);
 
-  const onClick = async () => {
-    if (busy) return;
-    setBusy(true);
+  const buy = async () => {
     try {
-      const provider = await getBrowserProvider();
-      const signer = await provider.getSigner();
-      const mkt = getMarketplaceContract(signer);
-
-      if (isUSDT) {
-        const usdt = getUsdtContract(signer);
-        const me = await signer.getAddress();
-        const allowance: bigint = await usdt.allowance(me, ADDR.MARKETPLACE);
-        const need = BigInt(price);
-        if (allowance < need) {
-          const txA = await usdt.approve(ADDR.MARKETPLACE, need);
-          await txA.wait();
-        }
-        const tx = await mkt.buyWithUSDT(nft, tokenId);
-        await tx.wait();
-      } else {
-        const tx = await mkt.buy(nft, tokenId, { value: BigInt(price) });
-        await tx.wait();
-      }
-      alert("Purchased ✅");
+      setBusy(true);
+      const tx = await buyItem(nft, tokenId, seller, currency, priceWei);
+      setHash(tx?.hash);
+      alert("Purchase completed!");
     } catch (e: any) {
-      alert(e?.message || "Buy failed");
+      console.error(e);
+      alert(e?.message ?? "Buy failed");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button
-      onClick={onClick}
-      disabled={busy}
-      className={className || "px-4 py-2 rounded-lg bg-yellow-500/90 hover:bg-yellow-500 disabled:opacity-50"}
-    >
-      {busy ? "Processing..." : "Buy now"}
-    </button>
+    <>
+      <button
+        onClick={buy}
+        disabled={busy}
+        className="border border-green-500 text-green-400 rounded px-3 py-2 hover:bg-green-500 hover:text-black transition w-full"
+      >
+        {busy ? "Processing..." : `Buy Now (${ethers.formatEther(priceWei)} ${currency})`}
+      </button>
+
+      <TxToast hash={hash} explorerBase={DEFAULT_CHAIN.explorer} onClose={() => setHash(null)} />
+    </>
   );
 }

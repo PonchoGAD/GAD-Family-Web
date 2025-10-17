@@ -1,18 +1,14 @@
 "use client";
 
 import { useState } from "react";
-
-// Локальный helper, чтобы не тянуть лишние импорты
-function shorten(addr?: string) {
-  return addr ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : "—";
-}
+import { shorten } from "../../../lib/nft/utils";
 
 export default function AddressBadge({
   address,
-  title,
+  title = "Address",
   className = "",
 }: {
-  address?: `0x${string}` | string;
+  address?: string;
   title?: string;
   className?: string;
 }) {
@@ -25,20 +21,16 @@ export default function AddressBadge({
       await navigator.clipboard.writeText(a);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    } catch {
-      /* noop */
-    }
+    } catch {}
   };
 
   return (
     <button
-      className={`font-mono border rounded px-3 py-1 text-sm ${className}`}
-      title={a}
       onClick={copy}
+      className={`font-mono text-xs border rounded px-2 py-1 hover:bg-black hover:text-white transition ${className}`}
+      title={title}
     >
-      {title ? <span className="mr-2 opacity-70">{title}:</span> : null}
-      <span>{shorten(a)}</span>
-      <span className="ml-2 opacity-60">{copied ? "✓" : "⧉"}</span>
+      {a ? shorten(a) : "—"} {copied ? "✓" : ""}
     </button>
   );
 }

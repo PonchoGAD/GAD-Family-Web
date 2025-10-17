@@ -1,0 +1,15 @@
+// app/nft/history/page.tsx
+import type { Metadata } from "next";
+import ClientOnly from "../components/_ClientOnly";
+import HistoryClient from "./_HistoryClient";
+
+export const metadata: Metadata = { title: "NFT History" };
+export const dynamic = "force-dynamic";
+
+export default function Page() {
+  return (
+    <ClientOnly>
+      <HistoryClient />
+    </ClientOnly>
+  );
+}

@@ -1,5 +1,10 @@
-import ProfileClient from './ProfileClient';
-export default async function Page({ params }:{ params: Promise<{ wallet:string }> }) {
-  const { wallet } = await params;
-  return <ProfileClient wallet={wallet} />;
+"use client";
+
+import dynamic from "next/dynamic";
+
+// Загружаем компонент без SSR (чтобы избежать ошибок indexedDB)
+const ProfileClient = dynamic(() => import("./ProfileClient"), { ssr: false });
+
+export default function Page() {
+  return <ProfileClient />;
 }

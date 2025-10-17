@@ -1,0 +1,27 @@
+// pages/api/dao/stats.ts
+import type { NextApiRequest, NextApiResponse } from "next";
+import { ethers } from "ethers";
+import { liquidityVaultAbi } from "../../../../app/lib/nft/abis/liquidityVault";
+import { ADDR } from "../../../../app/lib/nft/config";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const provider = new ethers.JsonRpcProvider(process.env.BSC_RPC_URL);
+
+    const vault = new ethers.Contract(ADDR.VAULT, liquidityVaultAbi, provider);
+
+    const [total, users] = await vault.getVaultInfo();
+
+    const data = {
+      totalBNB: ethers.formatEther(total),
+      users: Number(users),
+      timestamp: Date.now(),
+    };
+
+    res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate");
+    res.status(200).json(data);
+  } catch (err: any) {
+    console.error("DAO stats fetch error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}

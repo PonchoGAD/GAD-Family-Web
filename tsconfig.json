@@ -28,7 +28,7 @@
     "components/**/*.tsx",
     "lib/**/*.ts",
     "lib/**/*.tsx"
-  ],
+, "app/nft/profile/[wallet]/ProfileClient.tsx", "app/nft/history/__page.tsx.bak", "app/lib/nft/ethers.ts.bak", "app/lib/nft/ai-mint/page.tsx.bak", "app/nft/components/NFTCard.tsx.bak", "app/nft/ClientProviders.tsx.bak", "app/nft/NftClientRoot.tsx.bak"  ],
   "exclude": [
     "node_modules",
     "contracts/**"       // исключаем hardhat-папку из Next-компиляции

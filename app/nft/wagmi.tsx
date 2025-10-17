@@ -1,29 +1,34 @@
 "use client";
 
-import React from "react";
-import { createConfig, http, WagmiProvider as BaseWagmiProvider } from "wagmi";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { bsc, bscTestnet, avalanche, avalancheFuji, sepolia } from "wagmi/chains";
+import { createConfig, http } from "wagmi";
+import { bsc } from "wagmi/chains";
+import { injected, walletConnect, coinbaseWallet } from "@wagmi/connectors";
+import { QueryClient } from "@tanstack/react-query";
+
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "demo";
 
 export const wagmiConfig = createConfig({
-  chains: [bsc, bscTestnet, avalanche, avalancheFuji, sepolia],
+  chains: [bsc],
+  connectors: [
+    injected({ shimDisconnect: true }),
+    walletConnect({
+      projectId: WC_PROJECT_ID,
+      showQrModal: true,
+    }),
+    coinbaseWallet({
+      appName: "GAD Family",
+      preference: "smartWalletOnly", // можешь убрать, если не нужно
+    }),
+  ],
   transports: {
     [bsc.id]: http("https://bsc-dataseed.binance.org"),
-    [bscTestnet.id]: http("https://data-seed-prebsc-1-s1.bnbchain.org:8545"),
-    [avalanche.id]: http("https://api.avax.network/ext/bc/C/rpc"),
-    [avalancheFuji.id]: http("https://api.avax-test.network/ext/bc/C/rpc"),
-    [sepolia.id]: http("https://sepolia.drpc.org"),
   },
   ssr: true,
 });
 
-const qc = new QueryClient();
+export const queryClient = new QueryClient();
 
-// 👇 экспорт должен называться WagmiProvider (именно так его ждёт Web3Root)
-export function WagmiProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <BaseWagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-    </BaseWagmiProvider>
-  );
-}
+export const DEFAULT_CHAIN_ID = bsc.id;
+export const DEFAULT_NFT_ADDRESS = process.env.NEXT_PUBLIC_NFT721_ADDR as
+  | `0x${string}`
+  | undefined;

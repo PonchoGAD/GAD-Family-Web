@@ -1,27 +1,45 @@
-// app/nft/safe-web3.ts
 "use client";
 
-let inited = false;
+import { ethers } from "ethers";
 
-export async function initWeb3ModalOnce() {
-  if (inited) return;
+let initialized = false;
+
+/**
+ * Простая инициализация Web3Modal или MetaMask,
+ * чтобы не падал импорт в NftClientRoot.
+ */
+export function initWeb3ModalOnce() {
+  if (initialized) return;
+  initialized = true;
+
   if (typeof window === "undefined") return;
+  const eth = (window as any).ethereum;
 
-  const [{ createWeb3Modal }, { wagmiConfig }] = await Promise.all([
-    import("@web3modal/wagmi/react"),
-    import("./wagmi"),
-  ]);
-
-  const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_ID || "";
-  if (!projectId) {
-    console.warn("Web3Modal: NEXT_PUBLIC_WALLETCONNECT_ID is empty");
+  if (!eth) {
+    console.warn("⚠️ MetaMask not detected. Web3Modal skipped.");
+    return;
   }
 
-  createWeb3Modal({
-    wagmiConfig,
-    projectId,
-    enableAnalytics: false,
-  });
+  console.log("✅ Web3Modal initialized (safe-web3.ts)");
+}
 
-  inited = true;
+/** Возвращает read-only провайдер (без MetaMask) */
+export async function getReadProvider() {
+  return new ethers.JsonRpcProvider(
+    process.env.NEXT_PUBLIC_RPC_URL ||
+      "https://bsc-dataseed1.binance.org"
+  );
+}
+
+/** Возвращает BrowserProvider (через MetaMask) */
+export async function getBrowserProvider() {
+  if (!(window as any).ethereum)
+    throw new Error("MetaMask not found. Please install MetaMask.");
+  return new ethers.BrowserProvider((window as any).ethereum);
+}
+
+/** Возвращает signer (подключённый пользователь) */
+export async function getSigner() {
+  const provider = await getBrowserProvider();
+  return await provider.getSigner();
 }

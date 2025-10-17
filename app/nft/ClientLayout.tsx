@@ -1,13 +1,13 @@
 "use client";
-
-import { useEffect } from "react";
-import { WagmiProvider } from "./wagmi";
-import { initWeb3ModalOnce } from "./safe-web3";
+import React from "react";
+import ClientProviders from "./ClientProviders.tsx.bak";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    initWeb3ModalOnce(); // инициализация строго в браузере
-  }, []);
-
-  return <WagmiProvider>{children}</WagmiProvider>;
+  return (
+    <ClientProviders>
+      <div className="min-h-screen bg-[#0E0E12] text-white">
+        {children}
+      </div>
+    </ClientProviders>
+  );
 }

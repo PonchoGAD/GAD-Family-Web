@@ -3,9 +3,9 @@
 
 import { useState } from "react";
 import { ethers } from "ethers";
-import { ADDR } from "../../../lib/nft/constants";
+import { ADDR } from "../../../lib/nft/config";
 import { getSigner } from "../../../lib/nft/eth";
-import nft721Abi from "../../../lib/nft/abis/nft721";
+import { nft721Abi } from "../../../lib/nft/abis/nft721";
 
 type UploadResp = { imageCid?: string; metadataCid?: string; tokenUri: string };
 
