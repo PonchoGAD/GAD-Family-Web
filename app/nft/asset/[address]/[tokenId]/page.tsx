@@ -1,10 +1,19 @@
-import AssetClient from "./AssetClient";
+'use client';
 
-export default async function Page({
-  params,
-}: {
-  params: { address: string; tokenId: string };
-}) {
+import AssetClient from './AssetClient';
+
+interface PageParams {
+  address: string;
+  tokenId: string;
+}
+
+// ✅ Убираем async и Promise, чтобы не ломалось при билде
+export default function Page({ params }: { params: PageParams }) {
   const { address, tokenId } = params;
-  return <AssetClient addressProp={address} tokenIdProp={tokenId} />;
+
+  return (
+    <main className="min-h-screen bg-[#0B0F17] text-white flex flex-col items-center justify-center p-6">
+      <AssetClient addressProp={address} tokenIdProp={tokenId} />
+    </main>
+  );
 }
