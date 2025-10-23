@@ -1,3 +1,4 @@
+// src/wallet/core/services/swaps.ts
 import type { Address } from 'viem';
 import { publicClient, toWei } from './bscClient';
 import { walletClientFromPriv } from './signer';
@@ -6,7 +7,7 @@ import { PCS_V2_ROUTER as ROUTER, NATIVE_SENTINEL } from './constants';
 import { quoteExactIn } from './quote';
 import { erc20Allowance } from './erc20';
 
-
+/** ---------- Helpers ---------- */
 const isNative = (addr: string) =>
   addr.toLowerCase() === NATIVE_SENTINEL.toLowerCase();
 
@@ -17,27 +18,33 @@ function minOutWithSlippage(amountOut: bigint, slippageBps: number): bigint {
   return (amountOut * (10_000n - bps)) / 10_000n;
 }
 
+/** ---------- Approve ---------- */
 async function approveIfNeeded(
   privKey: `0x${string}`,
   token: Address,
   owner: Address,
-  amountIn: bigint,
-): Promise<string | null> {
+  amountIn: bigint
+): Promise<`0x${string}` | null> {                 // ✅ точный тип хэша
   const allowance = await erc20Allowance(token, owner, ROUTER as Address);
   if (allowance >= amountIn) return null;
 
   const { wallet, account } = walletClientFromPriv(privKey);
-  const txHash = await wallet.writeContract({
+
+  const txHash = await (wallet as unknown as {
+    writeContract: (p: unknown) => Promise<`0x${string}`>;  // ✅ типизированный хэш
+  }).writeContract({
     address: token,
     abi: ERC20_ABI,
     functionName: 'approve',
     args: [ROUTER as Address, amountIn],
     account,
-  } as any);
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅ хэш правильного типа
   return txHash;
 }
 
+/** ---------- Swap ---------- */
 export async function swapExactIn(params: {
   privKey: `0x${string}`;
   tokenIn: Address;
@@ -67,40 +74,54 @@ export async function swapExactIn(params: {
   const onchainPath = normalizePath(path);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineSec);
 
+  // ---------- Native → Token ----------
   if (isNative(tokenIn)) {
-    const txHash = await wallet.writeContract({
+    const txHash = await (wallet as unknown as {
+      writeContract: (p: unknown) => Promise<`0x${string}`>; // ✅
+    }).writeContract({
       address: ROUTER as Address,
       abi: ROUTER_ABI,
       functionName: 'swapExactETHForTokensSupportingFeeOnTransferTokens',
       args: [minOut, onchainPath, to, deadline],
       account,
       value: amountIn,
-    } as any);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅
     return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
   }
 
+  // ---------- Token → Native ----------
   if (isNative(tokenOut)) {
     await approveIfNeeded(privKey, tokenIn, account.address as Address, amountIn);
-    const txHash = await wallet.writeContract({
+
+    const txHash = await (wallet as unknown as {
+      writeContract: (p: unknown) => Promise<`0x${string}`>; // ✅
+    }).writeContract({
       address: ROUTER as Address,
       abi: ROUTER_ABI,
       functionName: 'swapExactTokensForETHSupportingFeeOnTransferTokens',
       args: [amountIn, minOut, onchainPath, to, deadline],
       account,
-    } as any);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅
     return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
   }
 
+  // ---------- Token → Token ----------
   await approveIfNeeded(privKey, tokenIn, account.address as Address, amountIn);
-  const txHash = await wallet.writeContract({
+
+  const txHash = await (wallet as unknown as {
+    writeContract: (p: unknown) => Promise<`0x${string}`>;   // ✅
+  }).writeContract({
     address: ROUTER as Address,
     abi: ROUTER_ABI,
     functionName: 'swapExactTokensForTokensSupportingFeeOnTransferTokens',
     args: [amountIn, minOut, onchainPath, to, deadline],
     account,
-  } as any);
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+  });
+
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });   // ✅
   return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
 }

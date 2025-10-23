@@ -7,40 +7,33 @@ import { TOKENS } from './constants';
 type FactoryAbi = typeof FACTORY_ABI;
 type PairAbi = typeof PAIR_ABI;
 
-type ReadableClient = {
-  readContract: (p: unknown) => Promise<unknown>;
-};
+interface ReadableClient {
+  readContract(p: unknown): Promise<unknown>;
+}
 
 /** ---------- Служебные формулы Uniswap v2 ---------- */
 function getAmountOut(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
   if (amountIn === 0n || reserveIn === 0n || reserveOut === 0n) return 0n;
-  // fee 0.25% (9975/10000) — при необходимости поменяй под свой роутер
-  const amountInWithFee = amountIn * 9975n;
+  const amountInWithFee = amountIn * 9975n; // 0.25% fee
   const numerator = amountInWithFee * reserveOut;
   const denominator = reserveIn * 10000n + amountInWithFee;
   return numerator / denominator;
 }
 
-/** ---------- Пара из фабрики ---------- */
+/** ---------- Получить адрес пары ---------- */
 export async function getPairAddress(tokenA: Address, tokenB: Address): Promise<Address> {
-  const params = {
-    address: TOKENS ? (TOKENS as any) : undefined, // чтобы TS не ругался на tree-shaking; реальное значение ниже
-  }; // пустышка для TS — не используется
-
   const client = publicClient as unknown as ReadableClient;
   const res = (await client.readContract({
     address: (process.env.NEXT_PUBLIC_PCS_V2_FACTORY ??
-      // дефолт PCS V2 on BSC
       '0xCA143Ce32Fe78f1f7019d7d551a6402fC5350c73') as Address,
     abi: FACTORY_ABI as FactoryAbi,
     functionName: 'getPair',
-    args: [tokenA, tokenB] as [Address, Address],
+    args: [tokenA, tokenB],
   })) as Address;
-
   return res;
 }
 
-/** ---------- Резервы в паре ---------- */
+/** ---------- Резервы пары ---------- */
 export async function getReserves(pair: Address): Promise<{
   reserve0: bigint;
   reserve1: bigint;
@@ -63,14 +56,14 @@ export async function quoteExactIn(
   amountIn: bigint
 ): Promise<{ amountOut: bigint; path: Address[] }> {
   try {
-    // одинаковые токены
     if (tokenIn.toLowerCase() === tokenOut.toLowerCase()) {
       return { amountOut: amountIn, path: [tokenIn] };
     }
 
-    // 1) Пытаемся прямую пару
-    const directPair = await getPairAddress(tokenIn, tokenOut);
     const ZERO = '0x0000000000000000000000000000000000000000';
+
+    // Прямая пара
+    const directPair = await getPairAddress(tokenIn, tokenOut);
     if (directPair && directPair.toLowerCase() !== ZERO) {
       const { reserve0, reserve1 } = await getReserves(directPair);
       const out =
@@ -80,9 +73,8 @@ export async function quoteExactIn(
       return { amountOut: out, path: [tokenIn, tokenOut] };
     }
 
-    // 2) Через WBNB мост
+    // Через WBNB
     const WBNB = TOKENS.WBNB.address as Address;
-
     const pairA = await getPairAddress(tokenIn, WBNB);
     const pairB = await getPairAddress(WBNB, tokenOut);
 
@@ -103,7 +95,7 @@ export async function quoteExactIn(
       return { amountOut: out, path: [tokenIn, WBNB, tokenOut] };
     }
 
-    // 3) Ничего не нашли
+    // Нет пары
     return { amountOut: 0n, path: [tokenIn, tokenOut] };
   } catch (e) {
     console.warn('quoteExactIn error:', e);
