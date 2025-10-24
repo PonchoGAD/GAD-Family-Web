@@ -1,4 +1,3 @@
-// src/wallet/core/services/swaps.ts
 import type { Address } from 'viem';
 import { publicClient, toWei } from './bscClient';
 import { walletClientFromPriv } from './signer';
@@ -8,9 +7,7 @@ import { quoteExactIn } from './quote';
 import { erc20Allowance } from './erc20';
 
 /** ---------- Helpers ---------- */
-const isNative = (addr: string) =>
-  addr.toLowerCase() === NATIVE_SENTINEL.toLowerCase();
-
+const isNative = (addr: string) => addr.toLowerCase() === NATIVE_SENTINEL.toLowerCase();
 const normalizePath = (p: Address[]) => p;
 
 function minOutWithSlippage(amountOut: bigint, slippageBps: number): bigint {
@@ -24,15 +21,16 @@ async function approveIfNeeded(
   token: Address,
   owner: Address,
   amountIn: bigint
-): Promise<`0x${string}` | null> {                 // ✅ точный тип хэша
+): Promise<`0x${string}` | null> {
   const allowance = await erc20Allowance(token, owner, ROUTER as Address);
   if (allowance >= amountIn) return null;
 
   const { wallet, account } = walletClientFromPriv(privKey);
 
-  const txHash = await (wallet as unknown as {
-    writeContract: (p: unknown) => Promise<`0x${string}`>;  // ✅ типизированный хэш
-  }).writeContract({
+  // локально типизируем writeContract, чтобы вернуть строго `0x${string}`
+  const w = wallet as unknown as { writeContract: (p: unknown) => Promise<`0x${string}`> };
+
+  const txHash = await w.writeContract({
     address: token,
     abi: ERC20_ABI,
     functionName: 'approve',
@@ -40,7 +38,8 @@ async function approveIfNeeded(
     account,
   });
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅ хэш правильного типа
+  // hash уже типа `0x${string}` → совместим с viem
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
   return txHash;
 }
 
@@ -74,11 +73,12 @@ export async function swapExactIn(params: {
   const onchainPath = normalizePath(path);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineSec);
 
+  // унифицируем writeContract
+  const w = wallet as unknown as { writeContract: (p: unknown) => Promise<`0x${string}`> };
+
   // ---------- Native → Token ----------
   if (isNative(tokenIn)) {
-    const txHash = await (wallet as unknown as {
-      writeContract: (p: unknown) => Promise<`0x${string}`>; // ✅
-    }).writeContract({
+    const txHash = await w.writeContract({
       address: ROUTER as Address,
       abi: ROUTER_ABI,
       functionName: 'swapExactETHForTokensSupportingFeeOnTransferTokens',
@@ -87,7 +87,7 @@ export async function swapExactIn(params: {
       value: amountIn,
     });
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
     return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
   }
 
@@ -95,9 +95,7 @@ export async function swapExactIn(params: {
   if (isNative(tokenOut)) {
     await approveIfNeeded(privKey, tokenIn, account.address as Address, amountIn);
 
-    const txHash = await (wallet as unknown as {
-      writeContract: (p: unknown) => Promise<`0x${string}`>; // ✅
-    }).writeContract({
+    const txHash = await w.writeContract({
       address: ROUTER as Address,
       abi: ROUTER_ABI,
       functionName: 'swapExactTokensForETHSupportingFeeOnTransferTokens',
@@ -105,16 +103,14 @@ export async function swapExactIn(params: {
       account,
     });
 
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash }); // ✅
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
     return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
   }
 
   // ---------- Token → Token ----------
   await approveIfNeeded(privKey, tokenIn, account.address as Address, amountIn);
 
-  const txHash = await (wallet as unknown as {
-    writeContract: (p: unknown) => Promise<`0x${string}`>;   // ✅
-  }).writeContract({
+  const txHash = await w.writeContract({
     address: ROUTER as Address,
     abi: ROUTER_ABI,
     functionName: 'swapExactTokensForTokensSupportingFeeOnTransferTokens',
@@ -122,6 +118,6 @@ export async function swapExactIn(params: {
     account,
   });
 
-  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });   // ✅
+  const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
   return { quoteOut: amountOut, minOut, path: onchainPath, txHash, receipt };
 }

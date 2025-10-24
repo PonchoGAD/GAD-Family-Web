@@ -1,6 +1,5 @@
 import type {
   Abi,
-  Address,
   ContractFunctionName,
   ReadContractParameters,
 } from 'viem';
@@ -8,7 +7,7 @@ import { publicClient } from './bscClient';
 
 /**
  * Универсальный helper для безопасного чтения данных из контракта
- * (без жёстких generic-конфликтов Viem).
+ * (без any и без конфликтов generic-типов Viem).
  */
 export async function readC<
   TOut = unknown,
@@ -17,12 +16,13 @@ export async function readC<
     TAbi,
     'view' | 'pure'
   >
->(params: ReadContractParameters<TAbi, TName> | any): Promise<TOut> {
+>(params: ReadContractParameters<TAbi, TName>): Promise<TOut> {
   try {
+    // сузим тип клиента локально, чтобы не тащить Viem-дженерики наружу
     const client = publicClient as unknown as {
       readContract: (p: unknown) => Promise<unknown>;
     };
-    const res = await client.readContract(params);
+    const res = await client.readContract(params as unknown);
     return res as TOut;
   } catch (e) {
     console.warn('readC error:', e);
