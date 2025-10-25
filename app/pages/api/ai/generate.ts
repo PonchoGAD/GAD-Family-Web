@@ -6,11 +6,16 @@ import fetch from "node-fetch";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+type PinataFileResp = {
+  IpfsHash?: string;
+  Hash?: string;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
   try {
-    const { prompt } = req.body;
+    const { prompt } = req.body as { prompt?: string };
     if (!prompt) return res.status(400).json({ error: "Prompt required" });
 
     // 🧠 Генерация изображения
@@ -20,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       size: "1024x1024",
     });
 
-    const imageUrl = image.data[0].url;
+    const imageUrl = image.data[0]?.url;
     if (!imageUrl) throw new Error("Image URL missing");
 
     // 📤 Загрузка на Pinata
@@ -36,16 +41,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: form,
     });
 
-    const data = await upload.json();
-    const ipfsHash = (data as any).IpfsHash || (data as any).Hash || "";
+    const data = (await upload.json()) as PinataFileResp;
+    const ipfsHash = data.IpfsHash || data.Hash || "";
 
     return res.status(200).json({
       success: true,
       imageUrl,
       ipfs: `https://gateway.pinata.cloud/ipfs/${ipfsHash}`,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    // eslint-disable-next-line no-console
     console.error("AI generate error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: message });
   }
 }

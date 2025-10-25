@@ -20,8 +20,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate");
     res.status(200).json(data);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    // eslint-disable-next-line no-console
     console.error("DAO stats fetch error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: message });
   }
 }

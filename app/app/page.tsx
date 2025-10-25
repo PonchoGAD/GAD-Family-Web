@@ -3,7 +3,7 @@
 import React from 'react';
 import type { ReactElement } from 'react';
 import Link from 'next/link';
-import { Smartphone, Shield, Users, HeartPulse, Wallet, MapPin, Clock, Rocket, Bug, CalendarDays, ExternalLink } from 'lucide-react';
+import { Shield, Users, HeartPulse, Wallet, MapPin, Clock, Rocket, Bug, CalendarDays, ExternalLink } from 'lucide-react';
 
 const FORM_URL = 'https://docs.google.com/forms/d/e/FORM_ID/viewform?embedded=true'; // TODO: replace with your App Beta form (or reuse invest form)
 const BUY_URL  = 'https://pancakeswap.finance/swap?inputCurrency=0x55d398326f99059fF775485246999027B3197955&outputCurrency=0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';

@@ -8,7 +8,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method !== "POST") return res.status(405).end();
 
   try {
-    const { to, uri, privateKey } = req.body;
+    const { to, uri, privateKey } = req.body as {
+      to?: string;
+      uri?: string;
+      privateKey?: string;
+    };
     if (!to || !uri || !privateKey)
       return res.status(400).json({ error: "Missing params (to, uri, privateKey)" });
 
@@ -25,8 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       hash: tx.hash,
       blockNumber: receipt.blockNumber,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    // eslint-disable-next-line no-console
     console.error("Mint error:", err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: message });
   }
 }
