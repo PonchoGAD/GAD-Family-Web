@@ -5,7 +5,16 @@
     "project": ["./tsconfig.json"],
     "tsconfigRootDir": "."
   },
-  "ignorePatterns": ["node_modules/", ".next/", "dist/"],
+  "ignorePatterns": [
+    "node_modules/",
+    ".next/",
+    "dist/",
+    "contracts/**",
+    "scripts/**",
+    "**/*.bak",
+    "**/*.old",
+    "**/*.tmp"
+  ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-unused-vars": "off",

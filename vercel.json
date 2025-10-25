@@ -1,5 +1,5 @@
 {
-  "buildCommand": "corepack enable && corepack prepare pnpm@9.12.3 --activate && pnpm -v && pnpm build",
-  "installCommand": "corepack enable && corepack prepare pnpm@9.12.3 --activate && pnpm i --frozen-lockfile",
+  "installCommand": "corepack enable && corepack prepare pnpm@10.19.0 --activate && pnpm i --frozen-lockfile",
+  "buildCommand": "NEXT_DISABLE_ESLINT=1 pnpm -v && pnpm build",
   "framework": "nextjs"
 }

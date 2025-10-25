@@ -5,21 +5,35 @@ import path from "path";
 const nextConfig = {
   reactStrictMode: true,
 
-  // где искать зависимости при серверном трейсинге
-  outputFileTracingRoot: path.join(process.cwd()),
+  // Уберём варнинг про "workspace root"
+  outputFileTracingRoot: path.resolve(process.cwd()),
 
-  // временно рендерим <Image> как <img>, чтобы не спотыкаться на оптимизации
+  // Упростим обработку изображений
   images: { unoptimized: true },
 
-  // главное — не валить билд из-за eslint
+  // Не валить билд из-за ESLint на CI
   eslint: { ignoreDuringBuilds: true },
 
-  // заглушки под web3-зависимости
-  webpack: (config) => {
-    // MetaMask SDK (через web3modal) иногда тянет RN-async-storage
+  webpack: (config, { isServer }) => {
+    // Твои прежние заглушки
     config.resolve.alias["@react-native-async-storage/async-storage"] = false;
-    // Некоторые пакеты могут запрашивать pino-pretty — заглушим
     config.resolve.alias["pino-pretty"] = false;
+
+    if (isServer) {
+      // Заглушаем любые IndexedDB-обёртки в серверной сборке
+      config.resolve.alias["idb"] = false;
+      config.resolve.alias["idb-keyval"] = false;
+      config.resolve.alias["dexie"] = false;
+      config.resolve.alias["localforage"] = false;
+
+      // Подменяем модуль с IndexedDB-хранилищем на серверный no-op
+      const stub = path.resolve(process.cwd(), "stubs/storage.server.ts");
+      // алиас по твоему @-пути
+      config.resolve.alias["@wallet/adapters/storage.web"] = stub;
+      // возможный абсолютный путь (если ts-paths разворачивает)
+      config.resolve.alias[path.resolve(process.cwd(), "src/wallet/adapters/storage.web.ts")] = stub;
+    }
+
     return config;
   },
 };

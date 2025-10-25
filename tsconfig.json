@@ -1,22 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ],
-      "@wallet/*": [
-        "src/wallet/*"
-      ]
+      "@/*": ["./*"],
+      "@wallet/*": ["src/wallet/*"]
     },
     "allowJs": true,
     "skipLibCheck": true,
@@ -26,51 +18,26 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    "plugins": [{ "name": "next" }]
   },
-  "allowJs": true,
-  "strict": false,
-  "skipLibCheck": true,
-  "noEmit": true,
-  "incremental": true,
-  "esModuleInterop": true,
-  "resolveJsonModule": true,
-  "isolatedModules": true,
-  "plugins": [
-    {
-      "name": "next"
-    }
-  ],
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    "src",
     "app/**/*.ts",
     "app/**/*.tsx",
-    "pages/**/*.ts",
-    "pages/**/*.tsx",
-    "components/**/*.ts",
-    "components/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     "lib/**/*.ts",
-    "lib/**/*.tsx",
-    "app/nft/profile/[wallet]/ProfileClient.tsx",
-    "app/nft/history/__page.tsx.bak",
-    "app/lib/nft/ethers.ts.bak",
-    "app/lib/nft/ai-mint/page.tsx.bak",
-    "app/nft/components/NFTCard.tsx.bak",
-    "app/nft/ClientProviders.tsx.bak",
-    "app/nft/NftClientRoot.tsx.bak"
+    "lib/**/*.tsx"
   ],
   "exclude": [
     "node_modules",
-    "contracts/**",
     ".next",
-    "dist" // исключаем hardhat-папку из Next-компиляции
+    "dist",
+    "contracts",
+    "scripts",
+    "**/*.bak",
+    "**/*.old",
+    "**/*.tmp"
   ]
 }

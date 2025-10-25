@@ -10,7 +10,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <h1 className="text-lg font-bold text-white">GAD NFT Marketplace</h1>
         <WalletConnectButton />
       </header>
-
       <main>{children}</main>
     </NftProvider>
   );

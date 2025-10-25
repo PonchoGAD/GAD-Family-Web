@@ -1,18 +1,13 @@
-// app/nft/ClientLayout.tsx
-"use client";
+// app/nft/layout.tsx
+import React from "react";
+import type { Metadata } from "next";
+import ClientLayout from "./ClientLayout";
 
-import NftProvider from "./providers/NftProvider";
-import WalletConnectButton from "../components/WalletConnectButton";
+export const metadata: Metadata = {
+  title: "GAD NFT Marketplace",
+  description: "Mint, list and collect GAD NFTs on BNB Chain."
+};
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <NftProvider>
-      {/* Простая верхняя панель — можешь стилизовать под твой UI */}
-      <div className="w-full flex items-center justify-end gap-3 p-4">
-        <WalletConnectButton />
-      </div>
-
-      {children}
-    </NftProvider>
-  );
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return <ClientLayout>{children}</ClientLayout>;
 }

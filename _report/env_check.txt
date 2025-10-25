@@ -1,0 +1,3 @@
+﻿.env.local exists: True
+.env         exists: False
+vercel.json  exists: True

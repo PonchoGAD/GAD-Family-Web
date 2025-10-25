@@ -1,0 +1,40 @@
+﻿
+> gad-family-web@0.1.0 build
+> next build
+
+   тЦ▓ Next.js 15.5.6
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+ тЬУ Compiled successfully in 89s
+   Skipping linting
+   Checking validity of types ...
+npm : Failed to compile.
+строка:36 знак:1
++ npm run build *>&1 | Tee-Object "$Report\next_build_output.txt"
++ ~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Failed to compile.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+./src/wallet/core/services/send.ts:18:45
+Type error: Argument of type '{ account: { address: Address; nonceManager?: NonceManager | undefined; sign: 
+((parameters: { hash: Hash; }) => Promise<Hex>) | undefined; ... 6 more ...; type: "local"; }; to: `0x${string}`; 
+value: bigint; }' is not assignable to parameter of type 'SendTransactionParameters<{ blockExplorers: { readonly 
+default: { readonly name: "BscScan"; readonly url: "https://bscscan.com"; readonly apiUrl: 
+"https://api.bscscan.com/api"; }; }; blockTime: 750; contracts: { ...; }; ... 11 more ...; serializers?: 
+ChainSerializers<...>; }, { ...; }, undefined, SendTransactionRequ...'.
+  Property 'kzg' is missing in type '{ account: { address: Address; nonceManager?: NonceManager | undefined; sign: 
+((parameters: { hash: Hash; }) => Promise<Hex>) | undefined; ... 6 more ...; type: "local"; }; to: `0x${string}`; 
+value: bigint; }' but required in type 'ExactRequired<{ kzg?: Kzg; }>'.
+
+[0m [90m 16 |[39m   [36mconst[39m { wallet[33m,[39m account } [33m=[39m makeWallet(privKey)[33m;[39m
+ [90m 17 |[39m   [36mconst[39m value [33m=[39m [36mtypeof[39m amountWei [33m===[39m [32m'string'[39m 
+[33m?[39m [33mBigInt[39m(amountWei) [33m:[39m amountWei[33m;[39m
+[31m[1m>[22m[39m[90m 18 |[39m   [36mconst[39m hash [33m=[39m [36mawait[39m 
+wallet[33m.[39msendTransaction({ account[33m,[39m to[33m,[39m value })[33m;[39m
+ [90m    |[39m                                             [31m[1m^[22m[39m
+ [90m 19 |[39m   [36mawait[39m publicClient[33m.[39mwaitForTransactionReceipt({ hash })[33m;[39m
+ [90m 20 |[39m   [36mreturn[39m hash[33m;[39m
+ [90m 21 |[39m }[0m
+Next.js build worker exited with code: 1 and signal: null

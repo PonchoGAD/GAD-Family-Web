@@ -1,34 +1,32 @@
+// app/nft/wagmi.tsx
 "use client";
 
-import { createConfig, http } from "wagmi";
+import { createConfig, http, WagmiProvider } from "wagmi";
 import { bsc } from "wagmi/chains";
 import { injected, walletConnect, coinbaseWallet } from "@wagmi/connectors";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "demo";
 
-export const wagmiConfig = createConfig({
+export const config = createConfig({
   chains: [bsc],
   connectors: [
     injected({ shimDisconnect: true }),
-    walletConnect({
-      projectId: WC_PROJECT_ID,
-      showQrModal: true,
-    }),
-    coinbaseWallet({
-      appName: "GAD Family",
-      preference: "smartWalletOnly", // можешь убрать, если не нужно
-    }),
+    walletConnect({ projectId: WC_PROJECT_ID, showQrModal: true }),
+    coinbaseWallet({ appName: "GAD Family" })
   ],
   transports: {
-    [bsc.id]: http("https://bsc-dataseed.binance.org"),
+    [bsc.id]: http("https://bsc-dataseed.binance.org")
   },
-  ssr: true,
+  ssr: true
 });
 
 export const queryClient = new QueryClient();
 
-export const DEFAULT_CHAIN_ID = bsc.id;
-export const DEFAULT_NFT_ADDRESS = process.env.NEXT_PUBLIC_NFT721_ADDR as
-  | `0x${string}`
-  | undefined;
+export function Web3Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </WagmiProvider>
+  );
+}
