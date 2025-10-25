@@ -19,6 +19,12 @@ const nextConfig = {
     config.resolve.alias["@react-native-async-storage/async-storage"] = false;
     config.resolve.alias["pino-pretty"] = false;
 
+    // ✅ Подмена expo-secure-store на веб-заглушку
+    config.resolve.alias["expo-secure-store"] = path.resolve(
+      process.cwd(),
+      "src/shims/expo-secure-store.ts"
+    );
+
     if (isServer) {
       // Заглушаем любые IndexedDB-обёртки в серверной сборке
       config.resolve.alias["idb"] = false;
@@ -28,9 +34,11 @@ const nextConfig = {
 
       // Подменяем модуль с IndexedDB-хранилищем на серверный no-op
       const stub = path.resolve(process.cwd(), "stubs/storage.server.ts");
-      // алиас по твоему @-пути
+
+      // Алиас по твоему @wallet пути
       config.resolve.alias["@wallet/adapters/storage.web"] = stub;
-      // возможный абсолютный путь (если ts-paths разворачивает)
+
+      // Возможный абсолютный путь (если ts-paths разворачивает)
       config.resolve.alias[path.resolve(process.cwd(), "src/wallet/adapters/storage.web.ts")] = stub;
     }
 
