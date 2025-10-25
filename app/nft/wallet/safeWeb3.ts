@@ -1,6 +1,6 @@
 // app/nft/wallet/safeWeb3.ts
 "use client";
-import { ethers } from "ethers";
+import { ethers, type Eip1193Provider } from "ethers";
 
 export type Web3State = {
   provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
@@ -9,12 +9,16 @@ export type Web3State = {
   chainId: number | null;
 };
 
+function getInjected(): Eip1193Provider | undefined {
+  return (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
+}
+
 export async function connectWallet(): Promise<Web3State> {
-  if (typeof window === "undefined" || !(window as any).ethereum) {
+  if (typeof window === "undefined" || !getInjected()) {
     throw new Error("Не найден injected-кошелёк (MetaMask / OKX / и т.п.).");
   }
-  const provider = new ethers.BrowserProvider((window as any).ethereum);
-  const accounts: string[] = await provider.send("eth_requestAccounts", []);
+  const provider = new ethers.BrowserProvider(getInjected()!);
+  const accounts = (await provider.send("eth_requestAccounts", [])) as unknown as string[];
   const signer = await provider.getSigner();
   const network = await provider.getNetwork();
 
@@ -27,9 +31,9 @@ export async function connectWallet(): Promise<Web3State> {
 }
 
 export async function getReadonlyProvider(rpcUrl?: string) {
-  // Если есть инжектed провайдер — используем его для чтения
-  if (typeof window !== "undefined" && (window as any).ethereum) {
-    return new ethers.BrowserProvider((window as any).ethereum);
+  // Если есть injected провайдер — используем его для чтения
+  if (typeof window !== "undefined" && getInjected()) {
+    return new ethers.BrowserProvider(getInjected()!);
   }
   // Иначе — fallback на RPC (если нужен readonly)
   if (!rpcUrl) {

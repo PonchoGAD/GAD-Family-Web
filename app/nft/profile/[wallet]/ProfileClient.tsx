@@ -7,9 +7,11 @@ import { getReadProvider } from "../../../lib/nft/eth";
 import { nft721Abi } from "../../../lib/nft/abis/nft721";
 import { ethers } from "ethers";
 
+type OwnedItem = { tokenId: string; owner: string };
+
 export default function ProfileClient() {
-  const { wallet } = useParams() as { wallet: string };
-  const [owned, setOwned] = useState<any[]>([]);
+  const { wallet } = useParams<{ wallet: string }>();
+  const [owned, setOwned] = useState<OwnedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,12 +29,13 @@ export default function ProfileClient() {
         const contract = new ethers.Contract(NFT_CONTRACT, nft721Abi, provider);
         const logs = await contract.queryFilter("Transfer", 0, "latest");
 
-        const nfts = logs
-          .map((l) => (l as any).args)
-          .filter((a) => a?.to?.toLowerCase() === wallet.toLowerCase())
+        const nfts: OwnedItem[] = logs
+          .map((l) => (l as unknown as { args?: { to?: string; tokenId?: bigint } }).args)
+          .filter((a): a is { to: string; tokenId: bigint } => !!a?.to && a?.tokenId !== undefined)
+          .filter((a) => a.to.toLowerCase() === wallet.toLowerCase())
           .map((a) => ({
-            tokenId: a?.tokenId?.toString(),
-            owner: a?.to,
+            tokenId: a.tokenId.toString(),
+            owner: a.to,
           }));
 
         setOwned(nfts);
@@ -64,9 +67,7 @@ export default function ProfileClient() {
           ))}
         </div>
       ) : (
-        <div className="text-gray-400 text-center mt-12">
-          You don't own any NFTs yet.
-        </div>
+        <div className="text-gray-400 text-center mt-12">You don&apos;t own any NFTs yet.</div>
       )}
     </main>
   );
