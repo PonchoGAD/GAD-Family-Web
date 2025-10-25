@@ -15,6 +15,18 @@ function minOutWithSlippage(amountOut: bigint, slippageBps: number): bigint {
   return (amountOut * (10_000n - bps)) / 10_000n;
 }
 
+// Узкий интерфейс для writeContract, чтобы не использовать any
+type NarrowWriter = {
+  writeContract: (p: {
+    address: Address;
+    abi: ReadonlyArray<unknown>;
+    functionName: string;
+    args?: readonly unknown[];
+    account: { address: Address } | Address;
+    value?: bigint;
+  }) => Promise<`0x${string}`>;
+};
+
 /** ---------- Approve ---------- */
 async function approveIfNeeded(
   privKey: `0x${string}`,
@@ -26,9 +38,7 @@ async function approveIfNeeded(
   if (allowance >= amountIn) return null;
 
   const { wallet, account } = walletClientFromPriv(privKey);
-
-  // локально типизируем writeContract, чтобы вернуть строго `0x${string}`
-  const w = wallet as unknown as { writeContract: (p: unknown) => Promise<`0x${string}`> };
+  const w = wallet as unknown as NarrowWriter;
 
   const txHash = await w.writeContract({
     address: token,
@@ -38,7 +48,6 @@ async function approveIfNeeded(
     account,
   });
 
-  // hash уже типа `0x${string}` → совместим с viem
   await publicClient.waitForTransactionReceipt({ hash: txHash });
   return txHash;
 }
@@ -73,8 +82,7 @@ export async function swapExactIn(params: {
   const onchainPath = normalizePath(path);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + deadlineSec);
 
-  // унифицируем writeContract
-  const w = wallet as unknown as { writeContract: (p: unknown) => Promise<`0x${string}`> };
+  const w = wallet as unknown as NarrowWriter;
 
   // ---------- Native → Token ----------
   if (isNative(tokenIn)) {

@@ -1,8 +1,4 @@
-import type {
-  Abi,
-  ContractFunctionName,
-  ReadContractParameters,
-} from 'viem';
+import type { Abi, ContractFunctionName, ReadContractParameters } from 'viem';
 import { publicClient } from './bscClient';
 
 /**
@@ -25,6 +21,7 @@ export async function readC<
     const res = await client.readContract(params as unknown);
     return res as TOut;
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.warn('readC error:', e);
     throw e;
   }

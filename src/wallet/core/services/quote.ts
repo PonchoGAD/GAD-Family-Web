@@ -7,8 +7,14 @@ import { TOKENS } from './constants';
 type FactoryAbi = typeof FACTORY_ABI;
 type PairAbi = typeof PAIR_ABI;
 
+// Типизируем минимально читаемого клиента, чтобы не тащить viem-дженерики наружу
 interface ReadableClient {
-  readContract(p: unknown): Promise<unknown>;
+  readContract(p: {
+    address: Address;
+    abi: ReadonlyArray<unknown>;
+    functionName: string;
+    args?: readonly unknown[];
+  }): Promise<unknown>;
 }
 
 /** ---------- Служебные формулы Uniswap v2 ---------- */
