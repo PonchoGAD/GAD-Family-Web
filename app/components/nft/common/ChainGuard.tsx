@@ -1,23 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { DEFAULT_CHAIN } from "../../../lib/nft/chains";
 
-export default function ChainGuard({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+type EIP1193 = {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+  on?(event: string, handler: (...args: unknown[]) => void): void;
+  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
+};
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
+
+export default function ChainGuard({ children }: { children: ReactNode }) {
   const [ok, setOk] = useState(true);
 
   useEffect(() => {
-    const anyWin = window as any;
-    const eth = anyWin?.ethereum;
+    const eth = getEth();
     if (!eth) return;
 
     const check = async () => {
       try {
-        const chainHex = await eth.request({ method: "eth_chainId" });
+        const chainHex = (await eth.request({ method: "eth_chainId" })) as string;
         const current = parseInt(chainHex, 16);
         setOk(current === DEFAULT_CHAIN.id);
       } catch {
@@ -25,9 +30,9 @@ export default function ChainGuard({
       }
     };
 
-    check();
-    eth?.on?.("chainChanged", check);
-    return () => eth?.removeListener?.("chainChanged", check);
+    void check();
+    eth.on?.("chainChanged", check);
+    return () => eth.removeListener?.("chainChanged", check);
   }, []);
 
   if (!ok) {

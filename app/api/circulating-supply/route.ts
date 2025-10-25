@@ -12,20 +12,30 @@ const PAIRS = [
 ];
 // =====================
 
+type BscscanBalanceResp = {
+  status?: string;
+  message?: string;
+  result?: string;
+};
+
 async function balanceOf(addr: string): Promise<bigint> {
   const url = `${BSC_API}?module=account&action=tokenbalance&contractaddress=${CONTRACT}&address=${addr}&tag=latest&apikey=${process.env.BSC_API_KEY || ''}`;
   const r = await fetch(url, { cache: 'no-store' });
-  const data = await r.json().catch(() => null) as any;
-  if (!data || data.status !== '1') return BigInt(0);
-  try { return BigInt(data.result); } catch { return BigInt(0); }
+  const data = (await r.json().catch(() => null)) as unknown as BscscanBalanceResp | null;
+  if (!data || data.status !== '1' || typeof data.result !== 'string') return 0n;
+  try {
+    return BigInt(data.result);
+  } catch {
+    return 0n;
+  }
 }
 
 export async function GET() {
   try {
     const rawBalances = await Promise.all(PAIRS.map(balanceOf));
-    const totalRaw = rawBalances.reduce((a, b) => a + b, BigInt(0));          // сумма GAD в LP (в 10^18)
-    const tokens = Number(totalRaw) / 10 ** DECIMALS;                  // в GAD
-    const result = Math.floor(tokens);                                  // CMC просит целое число
+    const totalRaw = rawBalances.reduce((a, b) => a + b, 0n); // сумма GAD в LP (в 10^18)
+    const tokens = Number(totalRaw) / 10 ** DECIMALS;         // в GAD
+    const result = Math.floor(tokens);                        // CMC просит целое число
     return new NextResponse(String(result), { headers: { 'Content-Type': 'text/plain' } });
   } catch {
     // Если BscScan недоступен — не ломаемся.

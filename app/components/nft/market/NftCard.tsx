@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { ethers } from "ethers";
-import { getReadProvider, getSigner } from "../../../lib/nft/eth";
+import { ethers, type Eip1193Provider } from "ethers";
+import { getReadProvider } from "../../../lib/nft/eth";
 import { ADDR } from "../../../lib/nft/config";
 import { nft721Abi } from "../../../lib/nft/abis/nft721";
 import { marketplaceAbi } from "../../../lib/nft/abis/marketplace";
@@ -14,6 +14,15 @@ type Props = {
   currency: string; // address(0)=BNB else USDT
   price: string; // in wei
 };
+
+type EIP1193 = Eip1193Provider & {
+  on?(event: string, handler: (...args: unknown[]) => void): void;
+  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
+};
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
 
 export default function NftCard({ nft, tokenId, seller, currency, price }: Props) {
   const [img, setImg] = React.useState<string | null>(null);
@@ -38,9 +47,11 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
         }
 
         const r = await fetch(url);
-        const meta = await r.json().catch(() => ({}));
-        if (meta?.image) {
-          let im = meta.image as string;
+        const meta = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+        const imgVal = meta?.image as string | undefined;
+
+        if (imgVal) {
+          let im = imgVal;
           if (im.startsWith("ipfs://")) {
             im =
               (process.env.NEXT_PUBLIC_IPFS_GATEWAY ||
@@ -49,7 +60,7 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
           }
           setImg(im);
         }
-        setName(meta?.name || `NFT #${tokenId}`);
+        setName((meta?.name as string | undefined) || `NFT #${tokenId}`);
       } catch {
         setName(`#${tokenId}`);
       }
@@ -61,8 +72,10 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
     setLoading(true);
     setMsg("");
     try {
-      if (!(window as any).ethereum) throw new Error("MetaMask not found");
-      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const eth = getEth();
+      if (!eth) throw new Error("MetaMask not found");
+
+      const provider = new ethers.BrowserProvider(eth);
       const signer = await provider.getSigner();
       const mkt = new ethers.Contract(ADDR.MARKETPLACE, marketplaceAbi, signer);
 
@@ -82,8 +95,9 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
         await tx.wait();
       }
       setMsg("✅ Purchase successful!");
-    } catch (e: any) {
-      setMsg(e?.message || "Buy failed");
+    } catch (e: unknown) {
+      const er = e as { message?: string };
+      setMsg(er?.message || "Buy failed");
     } finally {
       setLoading(false);
     }

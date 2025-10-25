@@ -29,9 +29,10 @@ export default function OfferPanel({
       const tx = await buyItem(nft, tokenId, seller, currency, ethers.parseEther(offerPrice));
       setHash(tx?.hash);
       alert("Offer sent!");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const er = e as { message?: string };
       console.error(e);
-      alert(e?.message ?? "Offer failed");
+      alert(er?.message ?? "Offer failed");
     } finally {
       setBusy(false);
     }

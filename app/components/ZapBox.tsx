@@ -1,11 +1,16 @@
 'use client';
 
 import React from 'react';
-import { BrowserProvider, Contract, parseUnits } from 'ethers';
+import { BrowserProvider, Contract, parseUnits, type Eip1193Provider } from 'ethers';
 import clsx from 'clsx';
 import { getAddress } from 'ethers';
 
-// ===== address helpers (устраняем "bad address checksum") =====
+// ===== EIP-1193 helper =====
+function getEth(): Eip1193Provider | undefined {
+  return (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
+}
+
+// ===== address helpers =====
 const isHexAddress = (s: string) => /^0x[0-9a-fA-F]{40}$/.test((s || '').trim());
 const normAddr = (s: string) => {
   const t = (s || '').trim();
@@ -14,8 +19,8 @@ const normAddr = (s: string) => {
 };
 
 /** ====== CONSTANTS (BSC mainnet) ====== */
-const ZAP_ADDR     = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC'; // твой GADZap
-const ROUTER_ADDR  = '0x10ED43C718714eb63d5aA57B78B54704E256024E'; // Pancake V2
+const ZAP_ADDR     = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC';
+const ROUTER_ADDR  = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
 const GAD_ADDR     = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const USDT_ADDR    = '0x55d398326f99059fF775485246999027B3197955';
 const WBNB_ADDR    = '0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
@@ -53,19 +58,28 @@ export default function ZapBox() {
   const connect = async () => {
     setMsg('');
     try {
-      const eth = (window as any).ethereum;
+      const eth = getEth();
       if (!eth) return setMsg('MetaMask not found');
       const prov = new BrowserProvider(eth);
-      const accs = await prov.send('eth_requestAccounts', []);
+      const accs = await prov.send('eth_requestAccounts', []) as string[];
       setProvider(prov);
       setAccount(accs?.[0] || '');
-      eth.on?.('accountsChanged', (accs: string[]) => setAccount(accs?.[0] || ''));
-    } catch (e: any) {
-      setMsg(e?.message || 'Failed to connect');
+
+      // ✅ вместо «висящего» выражения — явная подписка
+      const maybeOn = (eth as unknown as { on?: (e: string, h: (...args: unknown[]) => void) => void }).on;
+      if (maybeOn) {
+        maybeOn('accountsChanged', (...args: unknown[]) => {
+          const a = Array.isArray(args[0]) ? (args[0] as string[]) : [];
+          setAccount(a?.[0] || '');
+        });
+      }
+    } catch (e: unknown) {
+      const er = e as { message?: string };
+      setMsg(er?.message || 'Failed to connect');
     }
   };
 
-  /** ---- helpers to get contracts (всегда через normAddr) ---- */
+  /** ---- helpers to get contracts ---- */
   const getRouter = React.useCallback(async () => {
     if (!provider) return null;
     return new Contract(normAddr(ROUTER_ADDR), ROUTER_ABI, provider);
@@ -89,7 +103,7 @@ export default function ZapBox() {
     return new Contract(normAddr(USDT_ADDR), ERC20_ABI, provider);
   }, [provider]);
 
-  /** ---- slippage helper (bigint safe для ES2019+) ---- */
+  /** ---- slippage helper ---- */
   const applySlippage = (amountOut: bigint) => {
     const bps = BigInt(slippageBps);
     return (amountOut * (BigInt(10000) - bps)) / BigInt(10000);
@@ -104,30 +118,25 @@ export default function ZapBox() {
       const zap    = await getZap(true);
       if (!router || !zap) throw new Error('Router or Zap not ready');
 
-      // общая сумма в wei
       const totalBNB = parseUnits(bnbAmount || '0', 18);
-      if (totalBNB <= BigInt(0)) throw new Error('Amount must be > 0');
+      if (totalBNB <= 0n) throw new Error('Amount must be > 0');
 
-      // половина пойдёт на покупку GAD
-      const half = totalBNB / BigInt(2);
+      const half = totalBNB / 2n;
 
-      // ВАЖНО: path с нормализацией адресов
       const path = [normAddr(WBNB_ADDR), normAddr(GAD_ADDR)];
-
-      // оценим GAD для половины BNB (как WBNB → GAD)
-      const amounts: readonly bigint[] = await router.getAmountsOut(half, path);
+      const amounts = await router.getAmountsOut(half, path) as readonly bigint[];
       const expectedGAD = BigInt(amounts[amounts.length - 1].toString());
       const minGad = applySlippage(expectedGAD);
 
-      const deadline = Math.floor(Date.now() / 1000) + 600; // 10 минут
+      const deadline = Math.floor(Date.now() / 1000) + 600;
 
-      // minEth = 0 — как и обсуждали
-      const tx = await zap.zapWithBNB(minGad, BigInt(0), deadline, { value: totalBNB });
+      const tx = await zap.zapWithBNB(minGad, 0n, deadline, { value: totalBNB });
       await tx.wait();
       setMsg('Zapped with BNB ✅');
       setBnbAmount('');
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Zap failed');
+    } catch (e: unknown) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Zap failed');
     } finally {
       setBusy(false);
     }
@@ -143,25 +152,23 @@ export default function ZapBox() {
       const usdt   = await getUsdt(true);
       if (!router || !zap || !usdt) throw new Error('Contracts not ready');
 
-      // у USDT на BSC 18 decimals
       const amt = parseUnits(usdtAmount || '0', 18);
-      if (amt <= BigInt(0)) throw new Error('Amount must be > 0');
+      if (amt <= 0n) throw new Error('Amount must be > 0');
 
-      // approve если не хватает allowance
-      const allowance: bigint = await (await getUsdt(false))!.allowance(account, normAddr(ZAP_ADDR));
+      const usdtRo = await getUsdt(false);
+      const allowance = await usdtRo!.allowance(account, normAddr(ZAP_ADDR)) as bigint;
       if (allowance < amt) {
-        const txa = await usdt.approve(normAddr(ZAP_ADDR), parseUnits('1000000000000', 18)); // практич.∞
+        const txa = await usdt.approve(normAddr(ZAP_ADDR), parseUnits('1000000000000', 18));
         await txa.wait();
       }
 
-      // половина идёт на покупку GAD (маршрут USDT -> WBNB -> GAD)
-      const half = amt / BigInt(2);
+      const half = amt / 2n;
 
       const path = [normAddr(USDT_ADDR), normAddr(WBNB_ADDR), normAddr(GAD_ADDR)];
-      const amounts: readonly bigint[] = await router.getAmountsOut(half, path);
+      const amounts = await router.getAmountsOut(half, path) as readonly bigint[];
       const expectedGAD = BigInt(amounts[amounts.length - 1].toString());
       const minGad  = applySlippage(expectedGAD);
-      const minUSDT = applySlippage(amt - half); // минимум USDT для addLiquidity (вторая половина)
+      const minUSDT = applySlippage(amt - half);
 
       const deadline = Math.floor(Date.now() / 1000) + 600;
 
@@ -169,8 +176,9 @@ export default function ZapBox() {
       await tx.wait();
       setMsg('Zapped with USDT ✅');
       setUsdtAmount('');
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Zap failed');
+    } catch (e: unknown) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Zap failed');
     } finally {
       setBusy(false);
     }

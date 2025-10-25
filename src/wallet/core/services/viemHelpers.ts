@@ -14,7 +14,6 @@ export async function readC<
   >
 >(params: ReadContractParameters<TAbi, TName>): Promise<TOut> {
   try {
-    // сузим тип клиента локально, чтобы не тащить Viem-дженерики наружу
     const client = publicClient as unknown as {
       readContract: (p: unknown) => Promise<unknown>;
     };

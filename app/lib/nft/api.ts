@@ -44,7 +44,7 @@ export async function uploadToIpfsFromUrl(url: string, fileName = "asset.png", c
   return json(r); // { cid, uri, gatewayUrl, provider }
 }
 
-export async function pinJson(metadata: any, name?: string) {
+export async function pinJson(metadata: unknown, name?: string) {
   const r = await fetch(`${API}/api/nft/pin-json`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

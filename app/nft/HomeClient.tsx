@@ -6,22 +6,48 @@ import { getReadProvider } from "../lib/nft/eth";
 import { marketplaceAbi } from "../lib/nft/abis/marketplace";
 import { ethers } from "ethers";
 
+type ListedArgs = {
+  nft?: string;
+  tokenId?: bigint;
+  seller?: string;
+  price?: bigint;
+  currency?: string;
+};
+
+type ListedLog = {
+  args?: ListedArgs;
+};
+
+type ListingItem = {
+  nft: string;
+  tokenId: string;
+  seller: string;
+  price: string;
+  currency: "BNB" | "USDT";
+};
+
 export default function HomeClient() {
-  const [listings, setListings] = useState<any[]>([]);
+  const [listings, setListings] = useState<ListingItem[]>([]);
 
   useEffect(() => {
     (async () => {
       const provider = await getReadProvider();
-      const mkt = new ethers.Contract(ADDR.MARKETPLACE, marketplaceAbi, provider);
-      const logs = await mkt.queryFilter("Listed", 0, "latest");
+      // приведение к совместимому типу провайдера ethers v6
+      const mkt = new ethers.Contract(ADDR.MARKETPLACE, marketplaceAbi, provider as unknown as ethers.Provider);
 
-      const items = logs.map((l) => ({
-        nft: (l as any).args?.nft,
-        tokenId: (l as any).args?.tokenId?.toString(),
-        seller: (l as any).args?.seller,
-        price: (l as any).args?.price?.toString() || "0",
-        currency: (l as any).args?.currency === ethers.ZeroAddress ? "BNB" : "USDT",
-      }));
+      const logs = await mkt.queryFilter("Listed", 0, "latest") as unknown as ListedLog[];
+
+      const items: ListingItem[] = logs.map((l) => {
+        const a = l.args ?? {};
+        const currency = a.currency === ethers.ZeroAddress ? "BNB" as const : "USDT" as const;
+        return {
+          nft: String(a.nft ?? ""),
+          tokenId: (a.tokenId ?? 0n).toString(),
+          seller: String(a.seller ?? ""),
+          price: (a.price ?? 0n).toString(),
+          currency,
+        };
+      });
 
       setListings(items.reverse().slice(0, 20));
     })();
@@ -34,11 +60,11 @@ export default function HomeClient() {
         {listings.map((l, i) => (
           <NftCard
             key={i}
-            nft={l.nft}                // адрес контракта NFT
-            seller={l.seller}          // адрес продавца
-            tokenId={l.tokenId}        // ID токена
-            price={l.price}            // цена в wei
-            currency={l.currency}      // BNB или USDT
+            nft={l.nft}
+            seller={l.seller}
+            tokenId={l.tokenId}
+            price={l.price}
+            currency={l.currency}
           />
         ))}
       </div>

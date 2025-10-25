@@ -30,9 +30,10 @@ export default function ListingPanel({ nft, tokenId }: { nft: string; tokenId: s
       setTxHash(tx.hash);
       await tx.wait();
       setStatus("success");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const er = e as { message?: string };
       setStatus("error");
-      setErr(e.message);
+      setErr(er?.message);
     } finally {
       setBusy(false);
     }
@@ -50,9 +51,10 @@ export default function ListingPanel({ nft, tokenId }: { nft: string; tokenId: s
       setTxHash(tx.hash);
       await tx.wait();
       setStatus("success");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const er = e as { message?: string };
       setStatus("error");
-      setErr(e.message);
+      setErr(er?.message);
     } finally {
       setBusy(false);
     }
@@ -71,7 +73,7 @@ export default function ListingPanel({ nft, tokenId }: { nft: string; tokenId: s
 
       <select
         value={currency}
-        onChange={(e) => setCurrency(e.target.value as any)}
+        onChange={(e) => setCurrency(e.target.value as "BNB" | "USDT")}
         className="border rounded px-3 py-2 w-full bg-transparent"
       >
         <option value="BNB">BNB</option>

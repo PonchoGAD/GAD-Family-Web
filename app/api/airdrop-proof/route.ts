@@ -19,12 +19,16 @@ type Pack = {
 
 const ZERO = "0x" + "00".repeat(64);
 
-function getPackSafe(pack: any): Pack {
-  return {
-    root: typeof pack?.root === "string" ? pack.root : ZERO,
-    count: typeof pack?.count === "number" ? pack.count : 0,
-    map: (pack?.map ?? {}) as Pack["map"],
-  };
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function getPackSafe(pack: unknown): Pack {
+  const p = isRecord(pack) ? pack : {};
+  const root = typeof p.root === "string" ? p.root : ZERO;
+  const count = typeof p.count === "number" ? p.count : 0;
+  const map = (isRecord(p.map) ? (p.map as Record<string, { amount: string; amountWei: string; proof: string[] }>) : undefined);
+  return { root, count, map };
 }
 
 export async function GET(req: Request) {
@@ -33,7 +37,7 @@ export async function GET(req: Request) {
   const addressRaw = (searchParams.get("address") || "").trim();
   const address = addressRaw.toLowerCase();
 
-  const roots = (rootsJson as any) ?? {};
+  const roots = rootsJson as unknown;
   const basePack = getPackSafe(basePackJson);
   const bonusPack = getPackSafe(bonusPackJson);
 

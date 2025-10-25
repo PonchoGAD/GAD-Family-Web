@@ -2,7 +2,11 @@
 
 import React from 'react';
 import { BrowserProvider, Contract } from 'ethers';
-import clsx from 'clsx';
+
+type EIP1193 = {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+  on?(event: string, handler: (...args: unknown[]) => void): void;
+};
 
 const AIRDROP_ADDR = '0x022cE9320Ea1AB7E03F14D8C0dBD14903A940F79'; // GADAirdropV1
 const BSC_CHAIN_ID = 56;
@@ -53,28 +57,33 @@ function useCountdown(target: number) {
   return `${d}d ${h}h ${m}m ${s}s`;
 }
 
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
+
 // --- safe chainId getter (fallback на net_version)
-async function getChainIdSafe(eth: any): Promise<number | null> {
+async function getChainIdSafe(eth: EIP1193): Promise<number | null> {
   try {
-    const hex = await eth.request?.({ method: 'eth_chainId' });
-    if (hex) return parseInt(String(hex), 16);
+    const hex = await eth.request({ method: 'eth_chainId' });
+    if (hex != null) return parseInt(String(hex), 16);
   } catch {}
   try {
-    const id = await eth.request?.({ method: 'net_version' });
-    if (id) return Number(id);
+    const id = await eth.request({ method: 'net_version' });
+    if (id != null) return Number(id);
   } catch {}
   return null;
 }
 
 // --- switch network helper
-async function switchToBSC(eth: any) {
+async function switchToBSC(eth: EIP1193) {
   try {
     await eth.request({
       method: 'wallet_switchEthereumChain',
-      params: [{ chainId: '0x38' }], // 56
+      params: [{ chainId: '0x38' }],
     });
-  } catch (switchError: any) {
-    if (switchError?.code === 4902) {
+  } catch (switchError: unknown) {
+    const err = switchError as { code?: number };
+    if (err?.code === 4902) {
       try {
         await eth.request({
           method: 'wallet_addEthereumChain',
@@ -86,7 +95,7 @@ async function switchToBSC(eth: any) {
             blockExplorerUrls: ['https://bscscan.com/'],
           }],
         });
-      } catch (addErr) {
+      } catch (addErr: unknown) {
         console.error(addErr);
       }
     } else {
@@ -113,29 +122,33 @@ export default function ClaimAirdropPage() {
   const [eligible, setEligible] = React.useState<ProofResponse | null>(null);
 
   const countdown = useCountdown(CLAIM_START_TS);
-  const claimOpen = true; // <-- РАЗБЛОКИРОВАЛ: клейм всегда открыт
+  const claimOpen = true;
 
   const connect = async () => {
     setMsg('');
     try {
-      const eth = (window as any).ethereum;
+      const eth = getEth();
       if (!eth) { setMsg('MetaMask not found'); return; }
-      // не трогаем getNetwork() чтобы избежать eth_chainId в старых провайдерах
       const prov = new BrowserProvider(eth, 'any');
       const cid = await getChainIdSafe(eth);
       setChainId(cid);
-      const accs = await prov.send('eth_requestAccounts', []);
+      const accs = (await prov.send('eth_requestAccounts', [])) as unknown as string[];
       setProvider(prov);
       setAccount(accs?.[0] || '');
-      eth.on?.('accountsChanged', (a: string[]) => setAccount(a?.[0] || ''));
+
+      eth.on?.('accountsChanged', (...args: unknown[]) => {
+        const a = Array.isArray(args[0]) ? (args[0] as string[]) : [];
+        setAccount(a?.[0] || '');
+      });
       eth.on?.('chainChanged', async () => {
         const ncid = await getChainIdSafe(eth);
         setChainId(ncid);
         loadOnchainRef.current?.();
         loadProofsRef.current?.();
       });
-    } catch (e: any) {
-      setMsg(e?.message || 'Failed to connect wallet');
+    } catch (e) {
+      const err = e as { message?: string };
+      setMsg(err?.message || 'Failed to connect wallet');
     }
   };
 
@@ -155,8 +168,9 @@ export default function ClaimAirdropPage() {
       setDeadline(Number(dl));
       setBaseClaimed(Boolean(bc));
       setBonusClaimed(Boolean(boc));
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Failed to load airdrop info');
+    } catch (e) {
+      const err = e as { shortMessage?: string; message?: string };
+      setMsg(err?.shortMessage || err?.message || 'Failed to load airdrop info');
     }
   }, [provider, account]);
 
@@ -170,14 +184,14 @@ export default function ClaimAirdropPage() {
         setMsg('Not found in airdrop list (make sure you use the same wallet as in the form).');
         return;
       }
-      const data: ProofResponse = await r.json();
+      const data = (await r.json()) as ProofResponse;
       setEligible(data);
-    } catch (e: any) {
-      setMsg(e?.message || 'Failed to load proof');
+    } catch (e) {
+      const err = e as { message?: string };
+      setMsg(err?.message || 'Failed to load proof');
     }
   }, [account]);
 
-  // refs — чтобы дергать после chainChanged
   const loadOnchainRef = React.useRef<(() => void) | null>(null);
   const loadProofsRef  = React.useRef<(() => void) | null>(null);
   loadOnchainRef.current = () => { loadOnchain(); };
@@ -198,8 +212,9 @@ export default function ClaimAirdropPage() {
       await tx.wait();
       setMsg('Claimed base reward ✅');
       await loadOnchain();
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Claim failed');
+    } catch (e) {
+      const err = e as { shortMessage?: string; message?: string };
+      setMsg(err?.shortMessage || err?.message || 'Claim failed');
     } finally { setLoading(false); }
   };
 
@@ -214,8 +229,9 @@ export default function ClaimAirdropPage() {
       await tx.wait();
       setMsg('Claimed bonus reward ✅');
       await loadOnchain();
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Claim failed');
+    } catch (e) {
+      const err = e as { shortMessage?: string; message?: string };
+      setMsg(err?.shortMessage || err?.message || 'Claim failed');
     } finally { setLoading(false); }
   };
 
@@ -230,15 +246,16 @@ export default function ClaimAirdropPage() {
       await tx.wait();
       setMsg('Claimed both rewards ✅');
       await loadOnchain();
-    } catch (e: any) {
-      setMsg(e?.shortMessage || e?.message || 'Claim failed');
+    } catch (e) {
+      const err = e as { shortMessage?: string; message?: string };
+      setMsg(err?.shortMessage || err?.message || 'Claim failed');
     } finally { setLoading(false); }
   };
 
   const wrongNet = chainId !== null && chainId !== BSC_CHAIN_ID;
-  const canClaimBase = eligible?.inBase && !baseClaimed;
-  const canClaimBonus = eligible?.inBonus && !bonusClaimed;
-  const canClaimBoth = eligible?.inBase && eligible?.inBonus && !baseClaimed && !bonusClaimed;
+  const canClaimBase = Boolean(eligible?.inBase && !baseClaimed);
+  const canClaimBonus = Boolean(eligible?.inBonus && !bonusClaimed);
+  const canClaimBoth = Boolean(eligible?.inBase && eligible?.inBonus && !baseClaimed && !bonusClaimed);
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10">
@@ -250,7 +267,7 @@ export default function ClaimAirdropPage() {
           </button>
           {wrongNet && (
             <button
-              onClick={() => switchToBSC((window as any).ethereum)}
+              onClick={() => { const eth = getEth(); if (eth) void switchToBSC(eth); }}
               className="px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-500 text-white"
             >
               Switch to BSC
@@ -267,9 +284,9 @@ export default function ClaimAirdropPage() {
           <a className="underline font-semibold" href={`https://bscscan.com/address/${AIRDROP_ADDR}`} target="_blank" rel="noreferrer">
             {AIRDROP_ADDR}
           </a>
-          {/* таймер */}
-          {useCountdown(CLAIM_START_TS)
-            ? <span className="ml-2">Countdown: <b>{useCountdown(CLAIM_START_TS)}</b></span>
+          {/* корректный вызов хука: используем переменную countdown */}
+          {countdown
+            ? <span className="ml-2">Countdown: <b>{countdown}</b></span>
             : <span className="ml-2 font-semibold">Claim is OPEN!</span>}
         </div>
       </div>
@@ -283,7 +300,7 @@ export default function ClaimAirdropPage() {
               ? <>
                   <span className="text-red-400">Wrong (switch to BSC)</span>
                   <button
-                    onClick={() => switchToBSC((window as any).ethereum)}
+                    onClick={() => { const eth = getEth(); if (eth) void switchToBSC(eth); }}
                     className="px-2 py-1 text-xs rounded-md bg-red-500/80 hover:bg-red-500 text-white"
                   >
                     Switch
@@ -313,30 +330,21 @@ export default function ClaimAirdropPage() {
           <button
             onClick={claimBase}
             disabled={loading || wrongNet || !canClaimBase}
-            className={clsx(
-              'px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15',
-              (loading || wrongNet || !canClaimBase) && 'opacity-50 cursor-not-allowed'
-            )}
+            className={`px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 ${ (loading || wrongNet || !canClaimBase) ? 'opacity-50 cursor-not-allowed' : '' }`}
           >
             Claim Base
           </button>
           <button
             onClick={claimBonus}
             disabled={loading || wrongNet || !canClaimBonus}
-            className={clsx(
-              'px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15',
-              (loading || wrongNet || !canClaimBonus) && 'opacity-50 cursor-not-allowed'
-            )}
+            className={`px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 ${ (loading || wrongNet || !canClaimBonus) ? 'opacity-50 cursor-not-allowed' : '' }`}
           >
             Claim Bonus
           </button>
           <button
             onClick={claimBoth}
             disabled={loading || wrongNet || !canClaimBoth}
-            className={clsx(
-              'px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90',
-              (loading || wrongNet || !canClaimBoth) && 'opacity-50 cursor-not-allowed'
-            )}
+            className={`px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:opacity-90 ${ (loading || wrongNet || !canClaimBoth) ? 'opacity-50 cursor-not-allowed' : '' }`}
           >
             Claim Both
           </button>

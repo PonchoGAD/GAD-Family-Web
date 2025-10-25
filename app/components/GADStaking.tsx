@@ -7,19 +7,17 @@ import {
   Contract,
   formatUnits,
   parseUnits,
+  type Eip1193Provider,
 } from 'ethers';
 
-// ==== CONFIG ====
 const STAKING_ADDRESS = '0x0271167c2b1b1513434ECe38f024434654781594';
 const GAD_ADDRESS     = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const GAD_DECIMALS    = 18;
 const BSC_CHAIN_ID    = 56;
 const PUBLIC_BSC_RPC  = 'https://bsc-dataseed.binance.org/';
 
-// >>> Показываем только эти PID
 const VISIBLE_PIDS = new Set<number>([0, 1, 2, 3]);
 
-// ==== ABIs (минимум) ====
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
   'function balanceOf(address) view returns (uint256)',
@@ -37,7 +35,6 @@ const STAKING_ABI = [
   'function harvest(uint256 pid)',
 ];
 
-// helpers
 const fmt = (n: string | bigint, d = GAD_DECIMALS, max = 6) => {
   try { return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max }); }
   catch { return '0'; }
@@ -49,11 +46,14 @@ const ts = (t: bigint | number) => {
 };
 const cleanNum = (s: string) => (s || '').replace(',', '.').trim();
 
+type UserInfo = { amount: bigint; rewardDebt: bigint; unlockTime: bigint };
+type PoolTuple = [bigint, bigint, bigint, bigint, bigint, boolean, bigint];
+
 export default function GADStaking() {
   const [provider, setProvider] = React.useState<BrowserProvider | JsonRpcProvider | null>(null);
   const [account, setAccount]   = React.useState<string>('');
   const [chainId, setChainId]   = React.useState<number | null>(null);
-  const [pools, setPools]       = React.useState<any[]>([]);
+  const [pools, setPools]       = React.useState<Array<{ pid: number; pool: PoolTuple; user: UserInfo; pending: bigint }>>([]);
   const [err, setErr]           = React.useState<string>('');
 
   // read-only провайдер, чтобы пулы были видны без кошелька
@@ -64,31 +64,33 @@ export default function GADStaking() {
   const connect = async () => {
     setErr('');
     try {
-      const eth = (window as any).ethereum;
+      const eth = (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
       if (!eth) { setErr('MetaMask not found'); return; }
-      const prov = new BrowserProvider(eth);
+      const prov = new BrowserProvider(eth); // <-- корректный тип
       const net  = await prov.getNetwork();
       setChainId(Number(net.chainId));
       await prov.send('eth_requestAccounts', []);
       const signer = await prov.getSigner();
       setAccount(await signer.getAddress());
       setProvider(prov);
-    } catch (e:any) {
-      setErr(e?.message || 'Wallet connect failed');
+    } catch (e) {
+      const er = e as { message?: string };
+      setErr(er?.message || 'Wallet connect failed');
     }
   };
 
   const switchToBsc = async () => {
     try {
-      const eth = (window as any).ethereum;
+      const eth = (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
       if (!eth) return;
       await eth.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x38' }] });
       if (provider) {
-        const net = await (provider as any).getNetwork();
+        const net = await provider.getNetwork();
         setChainId(Number(net.chainId));
       }
-    } catch (e:any) {
-      setErr(e?.message || 'Cannot switch network');
+    } catch (e) {
+      const er = e as { message?: string };
+      setErr(er?.message || 'Cannot switch network');
     }
   };
 
@@ -98,21 +100,20 @@ export default function GADStaking() {
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, provider);
     const len = Number(await staking.poolLength());
 
-    const temp: any[] = [];
+    const temp: Array<{ pid: number; pool: PoolTuple; user: UserInfo; pending: bigint }> = [];
     for (let i = 0; i < len; i++) {
-      // показываем ТОЛЬКО PID 0,1,2,3
       if (!VISIBLE_PIDS.has(i)) continue;
 
-      const p = await staking.pools(i);
-      const u = account
-        ? await staking.users(i, account)
-        : { amount: BigInt(0), rewardDebt: BigInt(0), unlockTime: BigInt(0)};
-      const pend = account ? await staking.pendingReward(i, account) : BigInt(0);
+      const p = (await staking.pools(i)) as PoolTuple;
+      const u: UserInfo = account
+        ? (await staking.users(i, account)) as unknown as UserInfo
+        : { amount: 0n, rewardDebt: 0n, unlockTime: 0n };
+      const pend = account ? (await staking.pendingReward(i, account)) as bigint : 0n;
 
       temp.push({ pid: i, pool: p, user: u, pending: pend });
     }
 
-    // сортировка по lockPeriod, просто для красоты
+    // сортировка по lockPeriod (pool[0])
     temp.sort((a, b) => Number(a.pool[0]) - Number(b.pool[0]));
     setPools(temp);
   }, [provider, account]);
@@ -171,8 +172,8 @@ function PoolCard({
   pid, pool, user, pending, provider, account, disabledGlobal,
 }: {
   pid: number;
-  pool: any;
-  user: any;
+  pool: PoolTuple;
+  user: UserInfo;
   pending: bigint;
   provider: BrowserProvider | JsonRpcProvider | null;
   account: string;
@@ -209,8 +210,9 @@ function PoolCard({
       await tx.wait();
       setMsg('Approved');
       await refresh();
-    } catch (e:any) {
-      setMsg(e?.shortMessage || e?.message || 'Approve failed');
+    } catch (e) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Approve failed');
     } finally { setBusy(false); }
   };
 
@@ -225,8 +227,9 @@ function PoolCard({
       setAmt('');
       setMsg('Staked');
       await refresh();
-    } catch (e:any) {
-      setMsg(e?.shortMessage || e?.message || 'Stake failed');
+    } catch (e) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Stake failed');
     } finally { setBusy(false); }
   };
 
@@ -241,8 +244,9 @@ function PoolCard({
       setAmt('');
       setMsg('Unstaked');
       await refresh();
-    } catch (e:any) {
-      setMsg(e?.shortMessage || e?.message || 'Unstake failed');
+    } catch (e) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Unstake failed');
     } finally { setBusy(false); }
   };
 
@@ -256,8 +260,9 @@ function PoolCard({
       await tx.wait();
       setMsg('Harvested');
       await refresh();
-    } catch (e:any) {
-      setMsg(e?.shortMessage || e?.message || 'Harvest failed');
+    } catch (e) {
+      const er = e as { shortMessage?: string; message?: string };
+      setMsg(er?.shortMessage || er?.message || 'Harvest failed');
     } finally { setBusy(false); }
   };
 
@@ -309,6 +314,7 @@ function PoolCard({
       </div>
 
       {msg && <div className="mt-2 text-xs text-white/70">{msg}</div>}
+      {disabledGlobal && <div className="mt-2 text-xs text-red-400">Wrong network: switch to BNB Chain (56).</div>}
     </div>
   );
 }

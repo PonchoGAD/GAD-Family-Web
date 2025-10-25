@@ -3,7 +3,7 @@ const PINATA_GATEWAY = process.env.PINATA_GATEWAY || "https://gateway.pinata.clo
 
 export type PinJsonResp = { IpfsHash: string; PinSize: number; Timestamp: string };
 
-export const pinJSON = async (payload: any): Promise<{ cid: string; url: string }> => {
+export const pinJSON = async (payload: unknown): Promise<{ cid: string; url: string }> => {
   if (!PINATA_JWT) throw new Error("PINATA_JWT is missing in env");
   const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
     method: "POST",

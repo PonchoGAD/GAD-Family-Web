@@ -2,6 +2,7 @@ import type { Address } from 'viem';
 import { publicClient } from './bscClient';
 import { ERC20_ABI } from './abi';
 import { TOKENS, NATIVE_SENTINEL } from './constants';
+import { readC } from './viemHelpers';
 
 export type TokenMeta = { address: Address; symbol: string; name: string; decimals: number };
 
@@ -14,14 +15,28 @@ export async function getNativeBalance(user: `0x${string}`): Promise<number> {
   return Number(wei) / 1e18;
 }
 
-export async function getErc20Balance(token: Address, user: `0x${string}`, decimals = 18): Promise<number> {
+/**
+ * Локальный «мягкий» враппер поверх readC<T>, чтобы не тянуть сюда тяжёлые generic-типы Viem.
+ * На рантайме остаётся тот же readC, меняется лишь проверка типов на этапе TS.
+ */
+async function readLoose<T>(params: unknown): Promise<T> {
+  // каст только на типовом уровне; в рантайме это тот же объект
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  return readC<T>(params as never);
+}
+
+export async function getErc20Balance(
+  token: Address,
+  user: `0x${string}`,
+  decimals = 18
+): Promise<number> {
   try {
-    const bal = await publicClient.readContract({
+    const bal = await readLoose<bigint>({
       address: token,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [user],
-    } as any) as bigint; // ← приводим один раз
+    });
 
     return Number(bal) / 10 ** decimals;
   } catch (e) {
@@ -31,13 +46,18 @@ export async function getErc20Balance(token: Address, user: `0x${string}`, decim
 }
 
 export async function getErc20Meta(address: Address): Promise<TokenMeta> {
-  const [symbol, name, decimals] = await Promise.all([
-    publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'symbol'   } as any) as Promise<string>,
-    publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'name'     } as any) as Promise<string>,
-    publicClient.readContract({ address, abi: ERC20_ABI, functionName: 'decimals' } as any) as Promise<number>,
+  const [symbol, name, decimalsBn] = await Promise.all([
+    readLoose<string>({ address, abi: ERC20_ABI, functionName: 'symbol' }),
+    readLoose<string>({ address, abi: ERC20_ABI, functionName: 'name' }),
+    readLoose<bigint>({ address, abi: ERC20_ABI, functionName: 'decimals' }),
   ]);
 
-  return { address, symbol: String(symbol), name: String(name), decimals: Number(decimals) };
+  return {
+    address,
+    symbol: String(symbol),
+    name: String(name),
+    decimals: Number(decimalsBn),
+  };
 }
 
 export async function getKnownBalances(user: `0x${string}`) {

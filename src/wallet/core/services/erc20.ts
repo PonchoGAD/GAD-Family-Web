@@ -4,13 +4,19 @@ import { publicClient } from "./bscClient";
 
 /**
  * Универсальная безопасная обёртка для чтения контракта
- * — не ругается на generic'и Viem и возвращает значение как есть.
+ * — без any и без конфликтов generic-типов Viem.
  */
-async function safeRead<T>(
-  params: { address: Address; abi: any; functionName: string; args?: any[] }
-): Promise<T> {
+async function safeRead<T>(params: {
+  address: Address;
+  abi: unknown;
+  functionName: string;
+  args?: unknown[];
+}): Promise<T> {
   try {
-    const result = await (publicClient as any).readContract(params);
+    const client = publicClient as unknown as {
+      readContract: (p: unknown) => Promise<unknown>;
+    };
+    const result = await client.readContract(params as unknown);
     return result as T;
   } catch (e) {
     console.warn("safeRead error:", e);
@@ -34,7 +40,7 @@ export async function erc20BalanceOf(token: Address, owner: Address): Promise<bi
 
 export async function erc20Decimals(token: Address): Promise<number> {
   try {
-    const d = await safeRead<bigint>({
+    const d = await safeRead<number>({
       address: token,
       abi: ERC20_ABI,
       functionName: "decimals",

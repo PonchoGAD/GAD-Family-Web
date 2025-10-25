@@ -1,8 +1,16 @@
 'use client';
 
+type EIP1193 = {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+};
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
+
 export default function SwitchNetworkButton() {
   const switchToBsc = async () => {
-    const ethereum = (window as any).ethereum;
+    const ethereum = getEth();
     if (!ethereum) return alert('MetaMask not found');
 
     try {
@@ -10,9 +18,10 @@ export default function SwitchNetworkButton() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0x38' }], // 56
       });
-    } catch (switchError: any) {
+    } catch (switchError: unknown) {
+      const e = switchError as { code?: number; message?: string };
       // Если сеть не добавлена — добавим
-      if (switchError?.code === 4902) {
+      if (e?.code === 4902) {
         await ethereum.request({
           method: 'wallet_addEthereumChain',
           params: [{
@@ -24,7 +33,7 @@ export default function SwitchNetworkButton() {
           }]
         });
       } else {
-        alert(switchError?.message || 'Failed to switch network');
+        alert(e?.message || 'Failed to switch network');
       }
     }
   };

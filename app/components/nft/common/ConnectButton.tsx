@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { connectWallet, currentAccount } from "../../../lib/nft/web3";
 import AddressBadge from "./AddressBadge";
 
+type EIP1193 = {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+  on?(event: string, handler: (...args: unknown[]) => void): void;
+  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
+};
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
+
 export default function ConnectButton({
   onConnected,
   className = "",
@@ -23,8 +33,7 @@ export default function ConnectButton({
       }
     })();
 
-    const anyWin = window as any;
-    const eth = anyWin?.ethereum;
+    const eth = getEth();
     const handler = (accounts: string[]) => {
       const acc = accounts?.[0] ?? null;
       setAccount(acc);
@@ -40,8 +49,9 @@ export default function ConnectButton({
       const acc = await connectWallet();
       setAccount(acc);
       onConnected?.(acc);
-    } catch (e: any) {
-      alert(e?.message ?? "Wallet connection failed");
+    } catch (e: unknown) {
+      const er = e as { message?: string };
+      alert(er?.message ?? "Wallet connection failed");
     } finally {
       setBusy(false);
     }

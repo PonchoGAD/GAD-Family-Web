@@ -3,11 +3,21 @@
 import React from "react";
 import { ethers } from "ethers";
 
+type EIP1193 = {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+  on?(event: string, handler: (...args: unknown[]) => void): void;
+  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
+};
+
 type Props = {
   className?: string;
   onConnectedAction?: (address: string, signer: ethers.Signer) => void;
   onDisconnectedAction?: () => void;
 };
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
 
 export default function AiMintClient({ className, onConnectedAction, onDisconnectedAction }: Props) {
   const [account, setAccount] = React.useState<string | null>(null);
@@ -15,7 +25,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
   const [busy, setBusy] = React.useState(false);
 
   React.useEffect(() => {
-    const eth = (window as any)?.ethereum;
+    const eth = getEth();
     if (!eth) return;
 
     const handleAccountsChanged = async (accounts: string[]) => {
@@ -26,7 +36,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
           const provider = new ethers.BrowserProvider(eth);
           const signer = await provider.getSigner();
           onConnectedAction?.(addr, signer);
-        } catch {}
+        } catch { /* ignore */ }
       } else {
         setAccount(null);
         onDisconnectedAction?.();
@@ -35,11 +45,17 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
 
     const handleChainChanged = (hexId: string) => {
       const id = Number(hexId);
-      setChainId(isNaN(id) ? null : id);
+      setChainId(Number.isNaN(id) ? null : id);
     };
 
-    eth.request({ method: "eth_accounts" }).then(handleAccountsChanged).catch(() => {});
-    eth.request({ method: "eth_chainId" }).then(handleChainChanged).catch(() => {});
+    void eth.request({ method: "eth_accounts" }).then((res) => {
+      handleAccountsChanged(res as string[]);
+    }).catch(() => {});
+
+    void eth.request({ method: "eth_chainId" }).then((res) => {
+      handleChainChanged(String(res));
+    }).catch(() => {});
+
     eth.on?.("accountsChanged", handleAccountsChanged);
     eth.on?.("chainChanged", handleChainChanged);
 
@@ -50,12 +66,12 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
   }, [onConnectedAction, onDisconnectedAction]);
 
   const connect = async () => {
-    const eth = (window as any)?.ethereum;
+    const eth = getEth();
     if (!eth) return alert("Please install MetaMask");
 
     try {
       setBusy(true);
-      const accounts: string[] = await eth.request({ method: "eth_requestAccounts" });
+      const accounts = await eth.request({ method: "eth_requestAccounts" }) as string[];
       if (!accounts?.length) return;
 
       const provider = new ethers.BrowserProvider(eth);
@@ -68,12 +84,13 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
           method: "wallet_switchEthereumChain",
           params: [{ chainId: "0x38" }],
         });
-      } catch {}
+      } catch { /* user may reject, ignore */ }
 
       onConnectedAction?.(addr, signer);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const er = e as { message?: string };
       console.error(e);
-      alert(e?.message ?? "Failed to connect");
+      alert(er?.message ?? "Failed to connect");
     } finally {
       setBusy(false);
     }

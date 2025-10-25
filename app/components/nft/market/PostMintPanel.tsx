@@ -1,9 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { ethers } from "ethers";
+import { ethers, type Eip1193Provider } from "ethers";
 import { marketplaceAbi } from "../../../lib/nft/abis/marketplace";
 import { ADDR } from "../../../lib/nft/config";
+
+type EIP1193 = Eip1193Provider & {
+  request(args: { method: string; params?: unknown[] | Record<string, unknown> }): Promise<unknown>;
+};
+
+function getEth(): EIP1193 | undefined {
+  return (window as unknown as { ethereum?: EIP1193 }).ethereum;
+}
 
 export default function PostMintPanel({ nft, tokenId }: { nft: string; tokenId: string }) {
   const [price, setPrice] = useState("");
@@ -12,10 +20,11 @@ export default function PostMintPanel({ nft, tokenId }: { nft: string; tokenId: 
 
   async function listNFT() {
     try {
-      if (!(window as any).ethereum) return alert("MetaMask required");
+      const eth = getEth();
+      if (!eth) return alert("MetaMask required");
       setBusy(true);
 
-      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const provider = new ethers.BrowserProvider(eth);
       const signer = await provider.getSigner();
       const mkt = new ethers.Contract(ADDR.MARKETPLACE, marketplaceAbi, signer);
 
@@ -25,9 +34,10 @@ export default function PostMintPanel({ nft, tokenId }: { nft: string; tokenId: 
       const tx = await mkt.list(nft, tokenId, currencyAddr, value);
       await tx.wait();
       alert(`NFT listed for ${price} ${currency}`);
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const er = e as { message?: string };
       console.error(e);
-      alert(e?.message ?? "Listing failed");
+      alert(er?.message ?? "Listing failed");
     } finally {
       setBusy(false);
     }
@@ -46,7 +56,7 @@ export default function PostMintPanel({ nft, tokenId }: { nft: string; tokenId: 
 
       <select
         value={currency}
-        onChange={(e) => setCurrency(e.target.value as any)}
+        onChange={(e) => setCurrency(e.target.value as "BNB" | "USDT")}
         className="border rounded px-3 py-2 w-full bg-transparent mb-3"
       >
         <option value="BNB">BNB</option>
