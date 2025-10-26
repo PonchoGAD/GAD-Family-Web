@@ -1,6 +1,8 @@
 import type { Address } from "viem";
 import { ERC20_ABI } from "./abi";
 import { publicClient } from "./bscClient";
+// ✅ добавлено: безопасные адреса (BNB/NATIVE → WBNB)
+import { toErc20Address } from "../utils/safeAddresses";
 
 /**
  * Универсальная безопасная обёртка для чтения контракта
@@ -26,8 +28,9 @@ async function safeRead<T>(params: {
 
 export async function erc20BalanceOf(token: Address, owner: Address): Promise<bigint> {
   try {
+    const tokenAddr = toErc20Address(token as `0x${string}`) as Address; // ✅ нормализация
     return await safeRead<bigint>({
-      address: token,
+      address: tokenAddr,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [owner],
@@ -40,8 +43,9 @@ export async function erc20BalanceOf(token: Address, owner: Address): Promise<bi
 
 export async function erc20Decimals(token: Address): Promise<number> {
   try {
+    const tokenAddr = toErc20Address(token as `0x${string}`) as Address; // ✅ нормализация
     const d = await safeRead<number>({
-      address: token,
+      address: tokenAddr,
       abi: ERC20_ABI,
       functionName: "decimals",
     });
@@ -54,8 +58,9 @@ export async function erc20Decimals(token: Address): Promise<number> {
 
 export async function erc20Symbol(token: Address): Promise<string> {
   try {
+    const tokenAddr = toErc20Address(token as `0x${string}`) as Address; // ✅ нормализация
     const s = await safeRead<string>({
-      address: token,
+      address: tokenAddr,
       abi: ERC20_ABI,
       functionName: "symbol",
     });
@@ -72,8 +77,9 @@ export async function erc20Allowance(
   spender: Address
 ): Promise<bigint> {
   try {
+    const tokenAddr = toErc20Address(token as `0x${string}`) as Address; // ✅ нормализация
     return await safeRead<bigint>({
-      address: token,
+      address: tokenAddr,
       abi: ERC20_ABI,
       functionName: "allowance",
       args: [owner, spender],

@@ -2,6 +2,8 @@ import type { Address } from 'viem';
 import { FACTORY_ABI, PAIR_ABI } from './abi';
 import { publicClient } from './bscClient';
 import { TOKENS } from './constants';
+// ✅ добавлено: безопасные адреса токенов (BNB/NATIVE → WBNB)
+import { toErc20Address } from '../utils/safeAddresses';
 
 /** ---------- Вспомогательные типы ---------- */
 type FactoryAbi = typeof FACTORY_ABI;
@@ -62,49 +64,56 @@ export async function quoteExactIn(
   amountIn: bigint
 ): Promise<{ amountOut: bigint; path: Address[] }> {
   try {
-    if (tokenIn.toLowerCase() === tokenOut.toLowerCase()) {
-      return { amountOut: amountIn, path: [tokenIn] };
+    // ✅ нормализуем в ERC-20 адреса (BNB/NATIVE → WBNB)
+    const inErc20  = toErc20Address(tokenIn as `0x${string}`) as Address;
+    const outErc20 = toErc20Address(tokenOut as `0x${string}`) as Address;
+
+    if (inErc20.toLowerCase() === outErc20.toLowerCase()) {
+      return { amountOut: amountIn, path: [inErc20] };
     }
 
     const ZERO = '0x0000000000000000000000000000000000000000';
 
     // Прямая пара
-    const directPair = await getPairAddress(tokenIn, tokenOut);
+    const directPair = await getPairAddress(inErc20, outErc20);
     if (directPair && directPair.toLowerCase() !== ZERO) {
       const { reserve0, reserve1 } = await getReserves(directPair);
       const out =
-        tokenIn.toLowerCase() < tokenOut.toLowerCase()
+        inErc20.toLowerCase() < outErc20.toLowerCase()
           ? getAmountOut(amountIn, reserve0, reserve1)
           : getAmountOut(amountIn, reserve1, reserve0);
-      return { amountOut: out, path: [tokenIn, tokenOut] };
+      return { amountOut: out, path: [inErc20, outErc20] };
     }
 
     // Через WBNB
     const WBNB = TOKENS.WBNB.address as Address;
-    const pairA = await getPairAddress(tokenIn, WBNB);
-    const pairB = await getPairAddress(WBNB, tokenOut);
+    const pairA = await getPairAddress(inErc20, WBNB);
+    const pairB = await getPairAddress(WBNB, outErc20);
 
     if (pairA && pairB && pairA.toLowerCase() !== ZERO && pairB.toLowerCase() !== ZERO) {
       const { reserve0: r0a, reserve1: r1a } = await getReserves(pairA);
       const { reserve0: r0b, reserve1: r1b } = await getReserves(pairB);
 
       const mid =
-        tokenIn.toLowerCase() < WBNB.toLowerCase()
+        inErc20.toLowerCase() < WBNB.toLowerCase()
           ? getAmountOut(amountIn, r0a, r1a)
           : getAmountOut(amountIn, r1a, r0a);
 
       const out =
-        WBNB.toLowerCase() < tokenOut.toLowerCase()
+        WBNB.toLowerCase() < outErc20.toLowerCase()
           ? getAmountOut(mid, r0b, r1b)
           : getAmountOut(mid, r1b, r0b);
 
-      return { amountOut: out, path: [tokenIn, WBNB, tokenOut] };
+      return { amountOut: out, path: [inErc20, WBNB, outErc20] };
     }
 
     // Нет пары
-    return { amountOut: 0n, path: [tokenIn, tokenOut] };
+    return { amountOut: 0n, path: [inErc20, outErc20] };
   } catch (e) {
     console.warn('quoteExactIn error:', e);
-    return { amountOut: 0n, path: [tokenIn, tokenOut] };
+    // возвращаем “нулевую” котировку, но с нормализованными адресами
+    const inErc20  = toErc20Address(tokenIn as `0x${string}`) as Address;
+    const outErc20 = toErc20Address(tokenOut as `0x${string}`) as Address;
+    return { amountOut: 0n, path: [inErc20, outErc20] };
   }
 }
