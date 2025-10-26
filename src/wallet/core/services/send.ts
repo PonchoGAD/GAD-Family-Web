@@ -9,6 +9,9 @@ import { parseEther, parseUnits, type Abi, type Hash } from "viem";
 import { config } from "@/app/nft/wagmi";
 import { bsc } from "wagmi/chains";
 
+// ✅ безопасные утилы адресов
+import { normalizeRecipient, toErc20Address } from "../utils/safeAddresses";
+
 /** Литеральный chainId для типов waitForTransactionReceipt */
 const CHAIN_ID = 56 as const;
 
@@ -60,15 +63,14 @@ export async function sendNative(
 
   if (args.length === 3) {
     // legacy: (privKey, to, amountWei)
-    to = args[1] as `0x${string}`;
+    to = normalizeRecipient(args[1]) as `0x${string}`; // ✅ запрет NATIVE + checksum
     value = BigInt(args[2]);
   } else {
     // new: (to, amountEth)
-    to = args[0] as `0x${string}`;
+    to = normalizeRecipient(args[0]) as `0x${string}`; // ✅ запрет NATIVE + checksum
     value = parseEther(args[1]);
   }
 
-  // В этой версии core для sendTransaction можно передать chain
   const hash = await sendTransaction(config, {
     to,
     value,
@@ -76,7 +78,6 @@ export async function sendNative(
     chain: bsc,
   });
 
-  // А вот тут — строго chainId
   await waitForTransactionReceipt(config, {
     hash,
     chainId: CHAIN_ID,
@@ -91,6 +92,10 @@ export async function sendNative(
  * 1) new:    sendERC20(token, to, amountHumanStr, decimals?)
  * 2) legacy: sendERC20(privKey, token, to, amountWeiBigint)
  */
+
+// ⬇️ локальный union для точной типизации входа в toErc20Address
+type TokenLike = `0x${string}` | "BNB" | "WBNB" | "GAD" | "USDT";
+
 export async function sendERC20(
   token: `0x${string}`,
   to: `0x${string}`,
@@ -120,19 +125,20 @@ export async function sendERC20(
 
   if (isLegacy) {
     // legacy: (privKey, token, to, amountWei)
-    token = args[1] as `0x${string}`;
-    to = args[2] as `0x${string}`;
+    const tokenLike = args[1] as TokenLike;                      // ✅ сузили тип
+    token = toErc20Address(tokenLike) as `0x${string}`;          // ✅ BNB/NATIVE → WBNB
+    to = normalizeRecipient(args[2]) as `0x${string}`;           // ✅ запрет NATIVE + checksum
     amount = args[3] as bigint;
   } else {
     // new: (token, to, amountHumanStr, decimals?)
-    token = args[0] as `0x${string}`;
-    to = args[1] as `0x${string}`;
+    const tokenLike = args[0] as TokenLike;                      // ✅ сузили тип
+    token = toErc20Address(tokenLike) as `0x${string}`;          // ✅ BNB/NATIVE → WBNB
+    to = normalizeRecipient(args[1]) as `0x${string}`;           // ✅ запрет NATIVE + checksum
     const amountHuman = args[2] as string;
     const decimals = (args[3] as number | undefined) ?? 18;
     amount = parseUnits(amountHuman, decimals);
   }
 
-  // Для writeContract в твоей версии типов нужны и account, и chain (именно chain, не chainId)
   const hash = await writeContract(config, {
     address: token,
     abi: ERC20_ABI,
@@ -142,7 +148,6 @@ export async function sendERC20(
     chain: bsc,
   });
 
-  // Тут снова chainId
   await waitForTransactionReceipt(config, {
     hash,
     chainId: CHAIN_ID,
