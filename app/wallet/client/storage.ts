@@ -3,31 +3,33 @@
 // -------------------------------------------------
 const ENC_KEY = 'encryptedMnemonic';
 
-// convert between ArrayBuffer and base64
+// base64 helpers
 const b64 = {
-  enc: (buf: ArrayBuffer) =>
-    btoa(String.fromCharCode(...new Uint8Array(buf))),
-  dec: (b64: string) =>
-    Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer,
+  enc: (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf))),
+  dec: (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer,
 };
 
-async function deriveKey(password: string, salt: Uint8Array) {
+// ensure ArrayBuffer (not SAB)
+function toArrayBuffer(u8: Uint8Array): ArrayBuffer {
+  const out = new ArrayBuffer(u8.byteLength);
+  new Uint8Array(out).set(u8);
+  return out;
+}
+
+async function deriveKey(password: string, saltU8: Uint8Array) {
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey(
     'raw',
     enc.encode(password),
-    'PBKDF2',
+    { name: 'PBKDF2' },
     false,
     ['deriveKey']
   );
 
-  // приведение типов устраняет TS-ошибку без влияния на выполнение
-  const saltBuf = salt instanceof Uint8Array ? salt.buffer.slice(0) : salt;
-
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: saltBuf as BufferSource, // ✅ главное исправление
+      salt: toArrayBuffer(saltU8) as BufferSource, // ✅ главное исправление
       iterations: 100_000,
       hash: 'SHA-256',
     },
@@ -37,7 +39,6 @@ async function deriveKey(password: string, salt: Uint8Array) {
     ['encrypt', 'decrypt']
   );
 }
-
 
 // Encrypt mnemonic with password
 export async function setEncryptedMnemonic(mnemonic: string, password: string) {
@@ -67,17 +68,13 @@ export async function getEncryptedMnemonic(password: string): Promise<string | n
   if (!item) return null;
 
   try {
-    const parsed = JSON.parse(item);
+    const parsed = JSON.parse(item) as { iv: string; salt: string; data: string };
     const iv = new Uint8Array(b64.dec(parsed.iv));
     const salt = new Uint8Array(b64.dec(parsed.salt));
     const data = b64.dec(parsed.data);
 
     const key = await deriveKey(password, salt);
-    const plain = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      key,
-      data
-    );
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data);
 
     return new TextDecoder().decode(plain);
   } catch (e) {

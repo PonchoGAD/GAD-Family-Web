@@ -1,0 +1,143 @@
+/* style/wallet.css */
+/* Тёмная тема + нежные обводки, в едином стиле всего кошелька */
+
+:root {
+  --bg: #0B0C10;
+  --card: #1F2430;
+  --card-border: #2c3344;
+  --accent: #0A84FF;
+  --accent-hover: #1a8cff;
+  --muted: rgba(255,255,255,0.7);
+  --muted-2: rgba(255,255,255,0.5);
+  --gold: #ffd166;
+  --error: #ff647c;
+  --success: #00C49F;
+}
+
+html, body {
+  background: var(--bg);
+  color: #fff;
+}
+
+.gad-container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.gad-card {
+  background: color-mix(in oklab, var(--card) 60%, transparent);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.gad-title {
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.gad-subtitle {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gad-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background .15s ease, transform .06s ease;
+}
+
+.gad-btn:hover {
+  background: var(--accent-hover);
+}
+
+.gad-btn:disabled {
+  background: #2b3344;
+  color: rgba(255,255,255,.6);
+  cursor: not-allowed;
+}
+
+.gad-input, .gad-textarea {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+  outline: none;
+}
+
+.gad-input:focus, .gad-textarea:focus {
+  border-color: color-mix(in oklab, var(--accent) 50%, var(--card-border));
+}
+
+.gad-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.gad-chip {
+  border: 1px solid var(--card-border);
+  background: #10141E;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.gad-balance {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+}
+
+.gad-balance .item {
+  border: 1px solid var(--card-border);
+  background: #171b25;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.gad-balance .label {
+  color: var(--muted-2);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.gad-balance .value {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.gad-activity {
+  margin-top: 16px;
+}
+
+.gad-activity .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px dashed #293042;
+  padding: 10px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gad-activity .row:last-child {
+  border-bottom: 0;
+}
+
+.gad-tag-success { color: var(--success); }
+.gad-tag-error   { color: var(--error); }
+.gad-tag-gold    { color: var(--gold); }
