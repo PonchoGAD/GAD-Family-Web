@@ -1,7 +1,6 @@
 // scripts/make-airdrop.js
 import fs from 'fs';
 import path from 'path';
-import { createHash } from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

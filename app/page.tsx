@@ -5,9 +5,7 @@ import type { ReactElement } from 'react';
 import Image from 'next/image';
 import { Rocket, Shield, Coins, Users, LineChart, ExternalLink, Lock, Wallet, Github } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import InvestForm from "../app/components/InvestForm";
-import { Analytics } from "@vercel/analytics/react"
-import InvestButton from "../app/components/InvestButton";
+import type { PieLabelRenderProps } from "recharts";
 
 const CONTRACT_ADDRESS = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const BSCSCAN_URL = 'https://bscscan.com/address/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
@@ -73,7 +71,7 @@ export default function Page(): ReactElement {
 }
 
 function Header(): ReactElement {
-  const hasLogo = Boolean((CONFIG as any)?.brand?.logoUrl);
+  const hasLogo = Boolean(CONFIG?.brand?.logoUrl);
 
   return (
     <header className="sticky top-0 z-30 backdrop-blur bg-black/30 border-b border-white/10">
@@ -125,7 +123,7 @@ function Header(): ReactElement {
 }
 
 function Hero(): ReactElement {
-  const hasHero = Boolean((CONFIG as any)?.brand?.heroUrl);
+  const hasHero = Boolean(CONFIG?.brand?.heroUrl);
 
   return (
     <section className="relative overflow-hidden">
@@ -364,7 +362,13 @@ function Metric({ label, value }: { label: string; value: string | number }): Re
   );
 }
 
-function CustomTooltip({ active, payload }: any) {
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number }>;
+}) {
   if (!active || !payload?.length) return null;
   const { name, value } = payload[0];
   return (
@@ -418,7 +422,7 @@ function Tokenomics(): ReactElement {
             {data.map((t, idx) => (
               <li
                 key={idx}
-                className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3"
+                className="flex items-center justify_between bg-white/5 border border-white/10 rounded-xl p-3"
               >
                 <div className="flex items-center gap-2">
                   <span
@@ -437,7 +441,7 @@ function Tokenomics(): ReactElement {
         </div>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-          <div className="h-96 md:h-[28rem]">
+          <div className="h-96 md:h_[28rem]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
                 <Pie
@@ -448,7 +452,9 @@ function Tokenomics(): ReactElement {
                   outerRadius={115}
                   paddingAngle={2}
                   labelLine={false}
-                  label={({ percent }) => `${Math.round(Number(percent) * 100)}%`}
+                  label={(props: PieLabelRenderProps) =>
+                    `${Math.round(Number(props.percent ?? 0) * 100)}%`
+                  }
                 >
                   {data.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -468,7 +474,7 @@ function Tokenomics(): ReactElement {
 function Roadmap(): ReactElement {
   return (
     <section id="roadmap" className="py-14 bg-black/20 border-y border-white/10">
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="max-w-6xl mx_auto px-4">
         <h2 className="text-2xl md:text-3xl font-extrabold">Roadmap</h2>
         <div className="mt-6 grid md:grid-cols-3 gap-6">
           {CONFIG.roadmap.map((col, i) => (
@@ -487,11 +493,10 @@ function Roadmap(): ReactElement {
 
 function Footer(): ReactElement {
   return (
-    <footer className="py-8 text-white/70">
+    <footer className="py-8 text_white/70">
       <div className="max-w-6xl mx-auto px-4">
         © {new Date().getFullYear()} GAD Family • Built for real families
       </div>
     </footer>
   );
 }
-

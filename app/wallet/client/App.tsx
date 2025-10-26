@@ -6,8 +6,8 @@ import SendScreen from './screens/SendScreen';
 import ReceiveScreen from './screens/ReceiveScreen';
 import SwapScreen from './screens/SwapScreen';
 import type { Address } from 'viem';
+import { deriveAddressFromMnemonic, ensureMnemonic } from '@wallet/core/services/seed';
 
-import { deriveAddressFromMnemonic, ensureMnemonic } from '@wallet/core';
 import { getEncryptedMnemonic, setEncryptedMnemonic, clearAll } from '@wallet/adapters/storage.web';
 
 type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap';
