@@ -1,24 +1,27 @@
 // src/wallet/core/services/seed.ts
 import { mnemonicToAccount, generateMnemonic as viemGenerateMnemonic } from 'viem/accounts';
-import { bytesToHex, toHex } from 'viem';
+import { toHex } from 'viem';
 
-// 12/24 слов — используем дефолтный английский wordlist viem
+// 12/24 слов — viem по умолчанию использует английский wordlist.
+// Передаём undefined, чтобы не импортировать списки слов явно.
 export function generateMnemonic12(): string {
-  return viemGenerateMnemonic(undefined, 128);
+  return viemGenerateMnemonic(undefined as unknown as string[], 128);
 }
 
 export function generateMnemonic24(): string {
-  return viemGenerateMnemonic(undefined, 256);
+  return viemGenerateMnemonic(undefined as unknown as string[], 256);
 }
 
 export function privateKeyFromMnemonic(mnemonic: string): `0x${string}` {
   const acc = mnemonicToAccount(mnemonic);
-  const pkBytes = acc.getHdKey().privateKey;
-  if (!pkBytes) throw new Error('HD key does not expose a private key');
-  return bytesToHex(pkBytes) as `0x${string}`;
+  const hd = acc.getHdKey();
+  const pk = hd.privateKey;
+  if (!pk) throw new Error('Failed to derive private key from mnemonic');
+  // pk — Uint8Array; превращаем в 0x-hex
+  return toHex(pk);
 }
 
-// опционально: hex из строки (фиксированный size не обязателен)
+// опционально: hex из одной строки (если где-то нужно)
 export function toHexUtf8(s: string): `0x${string}` {
-  return toHex(s) as `0x${string}`;
+  return toHex(s, { size: 32 });
 }
