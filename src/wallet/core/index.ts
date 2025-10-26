@@ -9,4 +9,5 @@ export * from './services/viemHelpers';
 export * from './services/seed';
 
 
+
 // не экспортируем walletClientFromPriv повторно из bscClient ещё раз, чтобы не конфликтовать
