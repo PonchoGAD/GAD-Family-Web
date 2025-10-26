@@ -15,15 +15,15 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
 
   webpack: (config, { isServer }) => {
-    // Твои прежние заглушки
-    config.resolve.alias["@react-native-async-storage/async-storage"] = false;
-    config.resolve.alias["pino-pretty"] = false;
-
-    // ✅ Подмена expo-secure-store на веб-заглушку
+    // ── ✅ ВАЖНО: шимаем expo-secure-store на веб-реализацию
     config.resolve.alias["expo-secure-store"] = path.resolve(
       process.cwd(),
       "src/shims/expo-secure-store.ts"
     );
+
+    // Твои прежние заглушки
+    config.resolve.alias["@react-native-async-storage/async-storage"] = false;
+    config.resolve.alias["pino-pretty"] = false;
 
     if (isServer) {
       // Заглушаем любые IndexedDB-обёртки в серверной сборке
@@ -34,11 +34,9 @@ const nextConfig = {
 
       // Подменяем модуль с IndexedDB-хранилищем на серверный no-op
       const stub = path.resolve(process.cwd(), "stubs/storage.server.ts");
-
-      // Алиас по твоему @wallet пути
+      // алиас по твоему @-пути
       config.resolve.alias["@wallet/adapters/storage.web"] = stub;
-
-      // Возможный абсолютный путь (если ts-paths разворачивает)
+      // возможный абсолютный путь (если ts-paths разворачивает)
       config.resolve.alias[path.resolve(process.cwd(), "src/wallet/adapters/storage.web.ts")] = stub;
     }
 

@@ -28,6 +28,7 @@
     "app/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "src/types/**/*.d.ts",
     "lib/**/*.ts",
     "lib/**/*.tsx"
   ],
