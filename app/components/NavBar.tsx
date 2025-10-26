@@ -36,15 +36,15 @@ export default function NavBar() {
             NFT
           </Link>
 
-          {/* Earn */}
+          {/* Wallet */}
           <Link
-            href="/earn"
+            href="/wallet"
             className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:bg-[#e6bf59] transition"
           >
-            Earn
+            Wallet
           </Link>
 
-          {/* Farming */}
+          {/* Start Farming */}
           <Link
             href="/earn"
             className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:bg-[#e6bf59] transition"
