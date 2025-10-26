@@ -22,7 +22,6 @@ export default function ReceiveScreen() {
     })();
   }, []);
 
-  // ✅ эта функция и есть тот самый "copy"
   async function copy() {
     if (!address) return;
     await navigator.clipboard.writeText(address);

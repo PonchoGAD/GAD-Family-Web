@@ -10,14 +10,21 @@ import TransactionModal from "./../../../components/nft/common/TransactionModal"
 type Props = {
   nft: string;
   tokenId: string | number;
-  onDone?: () => void; // колбэк чтобы страница обновила состояние
-};
+  /** Next.js требует, чтобы имя callback в клиентском компоненте заканчивалось на Action */
+  onDoneAction?: () => void;
+} & Record<string, unknown>; // позволяем передать возможный устаревший onDone вне типа
 
-export default function CancelListingButton({ nft, tokenId, onDone }: Props) {
+export default function CancelListingButton(props: Props) {
+  const { nft, tokenId, onDoneAction, ...rest } = props;
+
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<"idle" | "signing" | "pending" | "success" | "error">("idle");
   const [txHash, setTxHash] = useState<string | undefined>(undefined);
   const [err, setErr] = useState<string | undefined>(undefined);
+
+  // мягкая поддержка старого имени пропа onDone (если где-то ещё используется)
+  const legacy = (rest as { onDone?: () => void }).onDone;
+  const onDoneSafe = onDoneAction ?? legacy;
 
   const run = async () => {
     try {
@@ -36,20 +43,11 @@ export default function CancelListingButton({ nft, tokenId, onDone }: Props) {
       if (rc?.status !== 1) throw new Error("Transaction reverted");
 
       setStatus("success");
-      onDone?.();
+      onDoneSafe?.();
     } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Cancel failed";
       setStatus("error");
-      let message = "Cancel failed";
-      if (e instanceof Error) {
-        message = e.message;
-      } else if (typeof e === "object" && e !== null) {
-        const maybe = e as { reason?: unknown; message?: unknown };
-        message =
-          (typeof maybe.reason === "string" && maybe.reason) ||
-          (typeof maybe.message === "string" && maybe.message) ||
-          message;
-      }
-      setErr(message);
+      setErr((e as { reason?: string }).reason || msg);
     }
   };
 

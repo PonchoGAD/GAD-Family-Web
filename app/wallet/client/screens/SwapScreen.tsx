@@ -25,12 +25,12 @@ export default function SwapScreen() {
 
     try {
       const res = await quoteExactIn(aIn, aOut, BigInt(Math.floor(v * 10 ** decimals)));
-      alert(`Quote\nYou'll get: ${Number(res.amountOut) / 10 ** outMeta.decimals} ${to}`);
+      const out = Number(res.amountOut) / 10 ** outMeta.decimals;
+      alert(`Quote\nYou'll get: ${out} ${to}`);
     } catch (e: unknown) {
-  const msg = e instanceof Error ? e.message : 'Swap failed';
-  alert(msg);
-}
-
+      const msg = e instanceof Error ? e.message : 'Swap failed';
+      alert(msg);
+    }
   };
 
   return (

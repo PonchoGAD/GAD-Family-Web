@@ -26,7 +26,7 @@ export function Card({
   );
 }
 
-// ✅ меняем onClick -> onClickAction
+// ✅ onClickAction — чтобы избежать предупреждений про Client Components
 export function GButton({
   title,
   onClickAction,
@@ -34,7 +34,7 @@ export function GButton({
   disabled,
 }: {
   title: string;
-  onClickAction?: () => void; // <-- ключевое изменение
+  onClickAction?: () => void;
   className?: string;
   disabled?: boolean;
 }) {

@@ -8,7 +8,6 @@ import { toWei } from '@/src/wallet/core/services/bscClient';
 import { sendNative, sendERC20 } from '@/src/wallet/core/services/send';
 import { TOKENS } from '@/src/wallet/core/services/constants';
 import { derivePrivKey } from '@/src/wallet/core/services/seed';
-// ⛔️ УБРАНО: import { getEncryptedMnemonic } from '@wallet/adapters/storage.web';
 
 export default function SendScreen() {
   const [recipient, setRecipient] = useState('');
@@ -18,7 +17,6 @@ export default function SendScreen() {
 
   useEffect(() => {
     (async () => {
-      // ✅ ЛЕНИВАЯ загрузка storage-модуля только на клиенте
       const { getEncryptedMnemonic } = await import('@wallet/adapters/storage.web');
 
       const password = prompt('Password to unlock wallet');
@@ -27,7 +25,7 @@ export default function SendScreen() {
       const m = await getEncryptedMnemonic(password);
       if (!m) return alert('Wrong password or no wallet found');
 
-      const pk = derivePrivKey(0, m); // передаём 2 аргумента
+      const pk = derivePrivKey(0, m);
       setPrivKey(pk as `0x${string}`);
     })().catch((e) => {
       console.error('Wallet unlock failed:', e);
@@ -59,7 +57,7 @@ export default function SendScreen() {
       }
       setAmount('');
       setRecipient('');
-    } catch (e: unknown) {
+    } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to send';
       alert(msg);
     }

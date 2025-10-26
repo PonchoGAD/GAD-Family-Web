@@ -29,15 +29,9 @@ export default function BuyNowButton({
       setHash(tx?.hash);
       alert("Purchase completed!");
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
+      const msg = e instanceof Error ? e.message : "Buy failed";
       console.error(e);
-      const message =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-          ? String((e as { message?: unknown }).message)
-          : "Buy failed";
-      alert(message);
+      alert(msg);
     } finally {
       setBusy(false);
     }
