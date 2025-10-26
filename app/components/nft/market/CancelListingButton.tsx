@@ -37,9 +37,19 @@ export default function CancelListingButton({ nft, tokenId, onDone }: Props) {
 
       setStatus("success");
       onDone?.();
-    } catch (e: any) {
+    } catch (e: unknown) {
       setStatus("error");
-      setErr(e?.reason || e?.message || "Cancel failed");
+      let message = "Cancel failed";
+      if (e instanceof Error) {
+        message = e.message;
+      } else if (typeof e === "object" && e !== null) {
+        const maybe = e as { reason?: unknown; message?: unknown };
+        message =
+          (typeof maybe.reason === "string" && maybe.reason) ||
+          (typeof maybe.message === "string" && maybe.message) ||
+          message;
+      }
+      setErr(message);
     }
   };
 

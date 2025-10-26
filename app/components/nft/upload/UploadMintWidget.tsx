@@ -31,22 +31,39 @@ export default function UploadMintWidget() {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j?.error || "Upload failed");
+      throw new Error((j as { error?: string })?.error || "Upload failed");
     }
     return (await res.json()) as UploadResp;
   };
 
   const detectMintFee = async (c721: ethers.Contract): Promise<bigint> => {
-    const candidates = ["mintFeeWei", "mintFee", "MINT_FEE", "fee"];
+    const candidates = ["mintFeeWei", "mintFee", "MINT_FEE", "fee"] as const;
+
     for (const fn of candidates) {
       try {
-        const v = await (c721 as any)[fn]();
-        if (typeof v === "bigint") return v;
-        if (v?._isBigNumber || v?._isBigNumberish) return BigInt(v.toString());
-      } catch {}
+        // динамический, но типобезопасный вызов
+        const maybe = (c721 as unknown as Record<string, unknown>)[fn];
+        if (typeof maybe === "function") {
+          const v = (await (maybe as () => Promise<unknown>)()) as unknown;
+
+          if (typeof v === "bigint") return v;
+
+          if (typeof v === "object" && v !== null) {
+            // поддержка BigNumber-подобных
+            const s = (v as { toString?: () => string }).toString?.();
+            if (typeof s === "string") return BigInt(s);
+          }
+        }
+      } catch {
+        // пробуем следующий кандидат
+      }
     }
     return ethers.parseEther("0.01");
   };
+
+  // перегрузки mintWithFee без any
+  type MintWithFee1 = (tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
+  type MintWithFee2 = (to: string, tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
 
   const mint = async () => {
     if (!fileDataUrl) return alert("Choose image first");
@@ -61,23 +78,34 @@ export default function UploadMintWidget() {
       const fee = await detectMintFee(c721);
 
       setStatus("Sending transaction…");
-      let tx;
+      const mwf = (c721 as unknown as { mintWithFee?: MintWithFee1 | MintWithFee2 }).mintWithFee;
+      if (!mwf) throw new Error("mintWithFee method not found");
+
+      let tx: ethers.TransactionResponse;
       try {
-        // mintWithFee(string)
-        tx = await (c721 as any).mintWithFee(tokenUri, { value: fee });
+        // вариант: mintWithFee(string)
+        tx = await (mwf as MintWithFee1)(tokenUri, { value: fee });
       } catch {
-        // mintWithFee(address,string)
+        // вариант: mintWithFee(address,string)
         const to = await signer.getAddress();
-        tx = await (c721 as any).mintWithFee(to, tokenUri, { value: fee });
+        tx = await (mwf as MintWithFee2)(to, tokenUri, { value: fee });
       }
+
       await tx.wait();
 
       setStatus("Minted ✅");
       alert("Minted ✅");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error(e);
-      setStatus(e?.message ?? "Mint failed");
-      alert(e?.message ?? "Mint failed");
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Mint failed";
+      setStatus(msg);
+      alert(msg);
     } finally {
       setBusy(false);
     }

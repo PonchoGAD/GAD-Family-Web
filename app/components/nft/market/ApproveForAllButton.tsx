@@ -7,8 +7,6 @@ import { ADDR } from "../../../lib/nft/config";
 import { getSigner } from "../../../lib/nft/eth";
 import TransactionModal from "../common/TransactionModal";
 
-
-
 export default function ApproveForAllButton({ nft }: { nft: string }) {
   const [approved, setApproved] = useState(false);
   const [status, setStatus] = useState<"idle" | "signing" | "pending" | "success" | "error">("idle");
@@ -43,9 +41,15 @@ export default function ApproveForAllButton({ nft }: { nft: string }) {
       await tx.wait();
       setApproved(true);
       setStatus("success");
-    } catch (e: any) {
+    } catch (e: unknown) {
       setStatus("error");
-      setErr(e.message);
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Approval failed";
+      setErr(message);
     }
   };
 

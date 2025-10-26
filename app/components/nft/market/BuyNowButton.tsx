@@ -28,9 +28,16 @@ export default function BuyNowButton({
       const tx = await buyItem(nft, tokenId, seller, currency, priceWei);
       setHash(tx?.hash);
       alert("Purchase completed!");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error(e);
-      alert(e?.message ?? "Buy failed");
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Buy failed";
+      alert(message);
     } finally {
       setBusy(false);
     }

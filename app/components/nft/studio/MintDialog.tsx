@@ -6,6 +6,10 @@ import { mintWithFee } from "../../../lib/nft/sdk";
 import TxToast from "../common/TxToast";
 import { DEFAULT_CHAIN } from "../../../lib/nft/chains";
 
+type Eip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
 export default function MintDialog({
   image,
   onMinted,
@@ -23,13 +27,30 @@ export default function MintDialog({
       setBusy(true);
       const metadata = { name, description: desc, image };
       const { url } = await pinJSON(metadata);
-      const tx = await mintWithFee(await window.ethereum.request({ method: "eth_accounts" }).then((a:any)=>a[0]), url);
+
+      // безопасно достаём адрес из провайдера без any
+      const eth = (window as unknown as { ethereum?: Eip1193Provider }).ethereum;
+      if (!eth) throw new Error("No EVM provider (window.ethereum) found");
+      const accs = (await eth.request({ method: "eth_accounts" })) as unknown;
+      const addr =
+        Array.isArray(accs) && typeof accs[0] === "string" ? (accs[0] as string) : "";
+
+      if (!addr) throw new Error("No connected account");
+
+      const tx = await mintWithFee(addr, url);
       setHash(tx?.hash);
       alert("NFT minted!");
       onMinted?.("new");
-    } catch (e: any) {
+    } catch (e: unknown) {
+      // eslint-disable-next-line no-console
       console.error(e);
-      alert(e?.message ?? "Mint failed");
+      const message =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Mint failed";
+      alert(message);
     } finally {
       setBusy(false);
     }
