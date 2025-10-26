@@ -1,6 +1,6 @@
 // app/mobile/src/wallet/services/constants.ts
 // ✅ Centralized config for all BSC-related constants
-
+'use client';
 export const BSC_CHAIN_ID = 56;
 
 export const PCS_V2_ROUTER = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
