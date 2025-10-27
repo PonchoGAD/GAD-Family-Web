@@ -1,14 +1,15 @@
 // src/wallet/core/services/seed.ts
 import { mnemonicToAccount, generateMnemonic as viemGenerateMnemonic } from 'viem/accounts';
 import { toHex } from 'viem';
+import { wordlist } from '@scure/bip39/wordlists/english';
 
 export function generateMnemonic12(): string {
-  // viem по умолчанию использует английский wordlist
-  return viemGenerateMnemonic(undefined, 128);
+  // Viem требует явный wordlist — используем английский
+  return viemGenerateMnemonic(wordlist, 128);
 }
 
 export function generateMnemonic24(): string {
-  return viemGenerateMnemonic(undefined, 256);
+  return viemGenerateMnemonic(wordlist, 256);
 }
 
 /** Вспомогательный интерфейс для доступа к HD-ключу без `any`. */
@@ -25,11 +26,9 @@ export function privateKeyFromMnemonic(mnemonic: string): `0x${string}` {
   const hdGetter = (acc as unknown as Partial<HdLike>).getHdKey;
   const hd = typeof hdGetter === 'function' ? hdGetter.call(acc) : undefined;
   const pk = hd?.privateKey;
-
   if (!pk) {
     throw new Error('Failed to derive private key from mnemonic');
   }
-
   return toHex(pk) as `0x${string}`;
 }
 
