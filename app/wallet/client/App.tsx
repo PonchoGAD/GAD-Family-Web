@@ -63,27 +63,27 @@ export default function App() {
     setStage('create-step1');
   }
 
+  // ✅ переписано на async/await для стабильности
   async function openExistingWalletAction() {
-    // Ask password → decrypt → go dashboard
     const pwd = window.prompt('Enter your wallet password');
     if (!pwd) return;
-    getEncryptedMnemonic(pwd)
-      .then((m) => {
-        if (!m) {
-          window.alert('Wrong password or no wallet found');
-          return;
-        }
-        const addr = deriveAddressFromMnemonic(m, 0) as Address;
-        setMnemonic(m);
-        setAddress(addr);
-        const savedName = localStorage.getItem('walletName') || 'My Wallet';
-        setWalletName(savedName);
-        setStage('dashboard');
-      })
-      .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : 'Failed to open wallet';
-        window.alert(msg);
-      });
+
+    try {
+      const m = await getEncryptedMnemonic(pwd);
+      if (!m) {
+        window.alert('Wrong password or no wallet found');
+        return;
+      }
+      const addr = deriveAddressFromMnemonic(m, 0) as Address;
+      setMnemonic(m);
+      setAddress(addr);
+      const savedName = localStorage.getItem('walletName') || 'My Wallet';
+      setWalletName(savedName);
+      setStage('dashboard');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to open wallet';
+      window.alert(msg);
+    }
   }
 
   // Handlers: Create (Step 1)
@@ -106,19 +106,30 @@ export default function App() {
       .catch(() => window.alert('Copy failed'));
   }
 
+  // ✅ добавлена защита от пустой mnemonic + нормализация имени
   async function finalizeCreateAction() {
     if (!confirmStored) {
       window.alert('Please confirm that you have safely stored your 12-word phrase');
       return;
     }
+    let name = walletName.trim();
+    if (!name) name = 'My Wallet';
+
+    let m = mnemonic.trim();
+    if (!m) {
+      m = generateMnemonic12();
+      setMnemonic(m);
+    }
+
     const pwd = window.prompt('Set a password to encrypt your wallet');
     if (!pwd) return;
 
     try {
-      await setEncryptedMnemonic(mnemonic, pwd);
-      localStorage.setItem('walletName', walletName.trim());
-      const addr = deriveAddressFromMnemonic(mnemonic, 0) as Address;
+      await setEncryptedMnemonic(m, pwd);
+      localStorage.setItem('walletName', name);
+      const addr = deriveAddressFromMnemonic(m, 0) as Address;
       setAddress(addr);
+      setWalletName(name);
       setStage('dashboard');
       window.alert('Wallet created successfully. Keep your 12 words safe!');
     } catch (e: unknown) {
@@ -196,9 +207,10 @@ export default function App() {
 
           <input
             value={walletName}
-            onChange={(e) => setWalletName(e.target.value)}
+            onChange={(e) => setWalletName(e.currentTarget.value)}
             className="mt-5 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
             placeholder="Wallet name"
+            autoFocus
           />
 
           <div className="mt-5 flex gap-3">
