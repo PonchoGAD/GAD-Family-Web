@@ -4,23 +4,27 @@ import React, { useEffect, useState } from 'react';
 import { Card, GButton } from '../components/UI';
 import type { Address } from 'viem';
 import { deriveAddressFromMnemonic } from '@/src/wallet/core/services/seed';
-import { getEncryptedMnemonic } from '@wallet/adapters/storage.web';
+
+// ✅ единая разблокировка на 20 минут
+import { useUnlock } from '@/src/wallet/core/state/UnlockProvider';
 
 export default function ReceiveScreen() {
   const [address, setAddress] = useState<Address | null>(null);
+  const { requireUnlock, getMnemonic } = useUnlock();
 
   useEffect(() => {
     (async () => {
-      const password = prompt('Password to unlock wallet');
-      if (!password) return;
-
-      const mnemonic = await getEncryptedMnemonic(password);
-      if (!mnemonic) return alert('Wrong password or no wallet found');
-
-      const addr = deriveAddressFromMnemonic(mnemonic, 0) as Address;
-      setAddress(addr);
+      try {
+        await requireUnlock(); // спросит пароль только если не разблокировано
+        const m = getMnemonic();
+        const addr = deriveAddressFromMnemonic(m, 0) as Address;
+        setAddress(addr);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to unlock wallet';
+        alert(msg);
+      }
     })();
-  }, []);
+  }, [requireUnlock, getMnemonic]);
 
   async function copy() {
     if (!address) return;
