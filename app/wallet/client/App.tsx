@@ -6,7 +6,7 @@ import SendScreen from './screens/SendScreen';
 import ReceiveScreen from './screens/ReceiveScreen';
 import SwapScreen from './screens/SwapScreen';
 import type { Address } from 'viem';
-import { deriveAddressFromMnemonic, generateMnemonic12 } from '@wallet/core/services/seed';
+import { deriveAddressFromMnemonic /* generateMnemonic12 */ } from '@wallet/core/services/seed';
 import { getEncryptedMnemonic, setEncryptedMnemonic, clearAll } from '@wallet/adapters/storage.web';
 
 type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap';
@@ -27,12 +27,8 @@ function DownloadBanner() {
       }}
     >
       <div style={{ fontWeight: 700 }}>Download Wallet</div>
-      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
-        iOS — soon
-      </a>
-      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
-        Android — soon
-      </a>
+      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>iOS — soon</a>
+      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>Android — soon</a>
     </div>
   );
 }
@@ -59,6 +55,15 @@ export default function App() {
     []
   );
 
+  // ---------- helper: stable BIP-39 generator via dynamic imports ----------
+  async function generateMnemonic12Safe(): Promise<string> {
+    // Динамически грузим @scure/bip39 и wordlist — это надёжно на Vercel
+    const bip39 = await import('@scure/bip39');
+    const { default: english } = await import('@scure/bip39/wordlists/english.js'); // default: string[]
+    // @scure/bip39.generateMnemonic(wordlist, strength)
+    return bip39.generateMnemonic(english as unknown as string[], 128);
+  }
+
   // Handlers: Landing
   function createNewWalletAction() {
     setWalletName('');
@@ -67,7 +72,7 @@ export default function App() {
     setStage('create-step1');
   }
 
-  // ✅ устойчивый вариант на async/await
+  // ✅ async/await
   async function openExistingWalletAction() {
     const pwd = window.prompt('Enter your wallet password');
     if (!pwd) return;
@@ -92,16 +97,16 @@ export default function App() {
   }
 
   // Handlers: Create (Step 1)
-  function continueFromStep1Action() {
+  async function continueFromStep1Action() {
     const name = walletName.trim();
     if (!name) {
       window.alert('Please enter a wallet name');
       return;
     }
-
     try {
-      const m12 = generateMnemonic12();
-      if (!m12 || typeof m12 !== 'string' || m12.trim().split(/\s+/).length < 12) {
+      // ⬇️ Генерим 12 слов через @scure/bip39 + english wordlist
+      const m12 = await generateMnemonic12Safe();
+      if (!m12 || m12.trim().split(/\s+/).length < 12) {
         window.alert('Failed to generate recovery phrase. Please try again.');
         return;
       }
@@ -123,7 +128,6 @@ export default function App() {
       .catch(() => window.alert('Copy failed'));
   }
 
-  // ✅ защита от пустой mnemonic + нормализация имени
   async function finalizeCreateAction() {
     if (!confirmStored) {
       window.alert('Please confirm that you have safely stored your 12-word phrase');
@@ -135,7 +139,7 @@ export default function App() {
     let m = (mnemonic ?? '').trim();
     if (!m || m.split(/\s+/).length < 12) {
       try {
-        m = generateMnemonic12();
+        m = await generateMnemonic12Safe(); // ⬅️ та же стабильная генерация
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to generate recovery phrase';
         window.alert(msg);
@@ -174,7 +178,6 @@ export default function App() {
               {(['Wallet', 'Send', 'Receive', 'Swap'] as const).map((t) => (
                 <button
                   key={t}
-                  type="button"
                   onClick={() => setTab(t)}
                   className={`px-4 py-2 rounded-xl font-semibold ${
                     tab === t ? 'bg-[#0A84FF]' : 'bg-[#1F2430] hover:bg-[#242a39]'
@@ -186,7 +189,7 @@ export default function App() {
             </div>
           )}
 
-          <button type="button" onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
+          <button onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
             reset
           </button>
         </div>
@@ -200,7 +203,9 @@ export default function App() {
         <DownloadBanner />
         <div className="rounded-2xl border border-[#2c3344] bg-[#1F2430]/60 p-6">
           <div className="text-2xl font-extrabold">Welcome to GAD Wallet</div>
-          <div className="opacity-80 mt-1">A self-custody wallet for BSC (BNB). Save your 12 words securely.</div>
+          <div className="opacity-80 mt-1">
+            A self-custody wallet for BSC (BNB). Save your 12 words securely.
+          </div>
 
           <div className="grid sm:grid-cols-2 gap-3 mt-6">
             <button
@@ -230,13 +235,13 @@ export default function App() {
           <div className="text-2xl font-extrabold">Step 1 — Name your wallet</div>
           <div className="opacity-80 mt-1">You can change it later.</div>
 
-          <input
-            value={walletName}
-            onChange={(e) => setWalletName(e.currentTarget.value)}
-            className="mt-5 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
-            placeholder="Wallet name"
-            autoFocus
-          />
+        <input
+          value={walletName}
+          onChange={(e) => setWalletName(e.currentTarget.value)}
+          className="mt-5 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
+          placeholder="Wallet name"
+          autoFocus
+        />
 
           <div className="mt-5 flex gap-3">
             <button
@@ -265,7 +270,9 @@ export default function App() {
       <div className="max-w-5xl mx-auto px-4 py-10 text-white">
         <div className="rounded-2xl border border-[#2c3344] bg-[#1F2430]/60 p-6">
           <div className="text-2xl font-extrabold">Step 2 — Your 12-word recovery phrase</div>
-          <div className="opacity-80 mt-1">Write these words down in order and keep them in a safe place.</div>
+          <div className="opacity-80 mt-1">
+            Write these words down in order and keep them in a safe place.
+          </div>
 
           <div className="grid sm:grid-cols-3 gap-2 mt-5">
             {words.map((w, i) => (

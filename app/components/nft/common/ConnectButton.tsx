@@ -15,10 +15,10 @@ function getEth(): EIP1193 | undefined {
 }
 
 export default function ConnectButton({
-  onConnected,
+  onConnectedAction,
   className = "",
 }: {
-  onConnected?: (account: string) => void;
+  onConnectedAction?: (account: string) => void; // ✅ переименовано для Next.js (TS71007)
   className?: string;
 }) {
   const [account, setAccount] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export default function ConnectButton({
       const acc = await currentAccount();
       if (acc) {
         setAccount(acc);
-        onConnected?.(acc);
+        onConnectedAction?.(acc);
       }
     })();
 
@@ -37,18 +37,18 @@ export default function ConnectButton({
     const handler = (accounts: string[]) => {
       const acc = accounts?.[0] ?? null;
       setAccount(acc);
-      if (acc) onConnected?.(acc);
+      if (acc) onConnectedAction?.(acc);
     };
     eth?.on?.("accountsChanged", handler);
     return () => eth?.removeListener?.("accountsChanged", handler);
-  }, [onConnected]);
+  }, [onConnectedAction]);
 
   const connect = async () => {
     try {
       setBusy(true);
       const acc = await connectWallet();
       setAccount(acc);
-      onConnected?.(acc);
+      onConnectedAction?.(acc);
     } catch (e: unknown) {
       const er = e as { message?: string };
       alert(er?.message ?? "Wallet connection failed");
