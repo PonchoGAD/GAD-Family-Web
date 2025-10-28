@@ -1,0 +1,39 @@
+{
+  "name": "GAD Minimal BSC Token List",
+  "timestamp": "2025-01-01T00:00:00+00:00",
+  "version": { "major": 1, "minor": 0, "patch": 0 },
+  "tokens": [
+    {
+      "chainId": 56,
+      "address": "BNB",
+      "symbol": "BNB",
+      "name": "BNB (Native)",
+      "decimals": 18,
+      "logoURI": ""
+    },
+    {
+      "chainId": 56,
+      "address": "0xBB4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+      "symbol": "WBNB",
+      "name": "Wrapped BNB",
+      "decimals": 18,
+      "logoURI": "https://assets.coingecko.com/coins/images/12591/small/binance-coin-logo.png"
+    },
+    {
+      "chainId": 56,
+      "address": "0x858bab88A5b8d7f29a40380C5F2D8d0b8812FE62",
+      "symbol": "GAD",
+      "name": "GAD Family",
+      "decimals": 18,
+      "logoURI": ""
+    },
+    {
+      "chainId": 56,
+      "address": "0x55d398326f99059fF775485246999027B3197955",
+      "symbol": "USDT",
+      "name": "Tether USD",
+      "decimals": 18,
+      "logoURI": "https://assets.coingecko.com/coins/images/325/small/Tether-logo.png"
+    }
+  ]
+}

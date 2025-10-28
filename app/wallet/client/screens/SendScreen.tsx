@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Card, GButton } from '../components/UI';
 import type { Address } from 'viem';
 
@@ -9,32 +9,21 @@ import { sendNative, sendERC20 } from '@/src/wallet/core/services/send';
 import { TOKENS } from '@/src/wallet/core/services/constants';
 import { derivePrivKey } from '@/src/wallet/core/services/seed';
 
+// 🔒 берём одноразовую разблокировку вместо prompt()
+import { useUnlock } from '@/src/wallet/core/state/UnlockProvider';
+
 export default function SendScreen() {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [tokenSymbol, setTokenSymbol] = useState<'BNB' | 'GAD' | 'USDT'>('BNB');
-  const [privKey, setPrivKey] = useState<`0x${string}` | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { getEncryptedMnemonic } = await import('@wallet/adapters/storage.web');
-
-      const password = prompt('Password to unlock wallet');
-      if (!password) return;
-
-      const m = await getEncryptedMnemonic(password);
-      if (!m) return alert('Wrong password or no wallet found');
-
-      const pk = derivePrivKey(0, m);
-      setPrivKey(pk as `0x${string}`);
-    })().catch((e) => {
-      console.error('Wallet unlock failed:', e);
-      alert(e instanceof Error ? e.message : 'Failed to unlock wallet');
-    });
-  }, []);
+  const { requireUnlock, getMnemonic } = useUnlock();
 
   async function handleSend() {
-    if (!privKey) return alert('Wallet is not ready');
+    // единообразная разблокировка (если уже разблокировано — просто вернётся)
+    await requireUnlock();
+    const m = getMnemonic();
+    const pk = derivePrivKey(0, m) as `0x${string}`;
 
     if (!recipient || !/^0x[0-9a-fA-F]{40}$/.test(recipient))
       return alert('Enter a valid recipient address');
@@ -49,10 +38,10 @@ export default function SendScreen() {
 
     try {
       if (tokenSymbol === 'BNB') {
-        const tx = await sendNative(privKey, recipient as Address, wei.toString());
+        const tx = await sendNative(pk, recipient as Address, wei.toString());
         alert(`Sent ${amount} ${tokenSymbol}\nTx: ${tx}`);
       } else {
-        const tx = await sendERC20(privKey, tokenAddr, recipient as Address, wei);
+        const tx = await sendERC20(pk, tokenAddr, recipient as Address, wei);
         alert(`Sent ${amount} ${tokenSymbol}\nTx: ${tx}`);
       }
       setAmount('');

@@ -9,6 +9,9 @@ import type { Address } from 'viem';
 import { deriveAddressFromMnemonic, generateMnemonic12 } from '@wallet/core/services/seed';
 import { getEncryptedMnemonic, setEncryptedMnemonic, clearAll } from '@wallet/adapters/storage.web';
 
+// 🔒 провайдер одноразовой разблокировки (20 мин)
+import { UnlockProvider, useUnlock } from '@/src/wallet/core/state/UnlockProvider';
+
 type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap';
 type Stage = 'landing' | 'create-step1' | 'create-step2' | 'open' | 'dashboard';
 
@@ -33,7 +36,16 @@ function DownloadBanner() {
   );
 }
 
+// Обворачиваем реальную логику в провайдер
 export default function App() {
+  return (
+    <UnlockProvider>
+      <AppInner />
+    </UnlockProvider>
+  );
+}
+
+function AppInner() {
   const [tab, setTab] = useState<Tab>('Wallet');
 
   // Onboarding state
@@ -44,6 +56,9 @@ export default function App() {
 
   // Active wallet state
   const [address, setAddress] = useState<Address | null>(null);
+
+  // 🔑 из провайдера (для сессии без повторного пароля)
+  const { setSession } = useUnlock();
 
   // Reset action
   const DangerReset = useMemo(
@@ -75,6 +90,10 @@ export default function App() {
         return;
       }
       const addr = deriveAddressFromMnemonic(m, 0) as Address;
+
+      // ⚡️ кладём расшифрованную фразу в сессию на 20 минут
+      setSession(m);
+
       setMnemonic(m);
       setAddress(addr);
       const savedName = localStorage.getItem('walletName') || 'My Wallet';
@@ -95,7 +114,6 @@ export default function App() {
       return;
     }
     try {
-      // ⬇️ Генерация 12 слов через стабильный генератор из seed.ts (ethers внутри)
       const m12 = generateMnemonic12();
       if (!m12 || m12.trim().split(/\s+/).length < 12) {
         window.alert('Failed to generate recovery phrase. Please try again.');
@@ -129,7 +147,6 @@ export default function App() {
 
     let m = (mnemonic ?? '').trim();
     if (!m || m.split(/\s+/).length < 12) {
-      // подстраховка — генерим прямо здесь
       try {
         m = generateMnemonic12();
       } catch (e) {
@@ -146,10 +163,15 @@ export default function App() {
     try {
       await setEncryptedMnemonic(m, pwd);
       localStorage.setItem('walletName', name);
+
       const addr = deriveAddressFromMnemonic(m, 0) as Address;
       setAddress(addr);
       setWalletName(name);
       setStage('dashboard');
+
+      // ⚡️ кладём фразу в сессию сразу после создания, чтобы не спрашивать пароль на Send/Receive/Swap
+      setSession(m);
+
       console.debug('[Wallet] stage -> dashboard (created)');
       window.alert('Wallet created successfully. Keep your 12 words safe!');
     } catch (e: unknown) {
