@@ -27,8 +27,12 @@ function DownloadBanner() {
       }}
     >
       <div style={{ fontWeight: 700 }}>Download Wallet</div>
-      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>iOS — soon</a>
-      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>Android — soon</a>
+      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
+        iOS — soon
+      </a>
+      <a href="#" style={{ background: '#0A84FF', color: '#fff', padding: '8px 12px', borderRadius: 10, textDecoration: 'none', fontWeight: 700 }}>
+        Android — soon
+      </a>
     </div>
   );
 }
@@ -63,7 +67,7 @@ export default function App() {
     setStage('create-step1');
   }
 
-  // ✅ переписано на async/await для стабильности
+  // ✅ устойчивый вариант на async/await
   async function openExistingWalletAction() {
     const pwd = window.prompt('Enter your wallet password');
     if (!pwd) return;
@@ -80,6 +84,7 @@ export default function App() {
       const savedName = localStorage.getItem('walletName') || 'My Wallet';
       setWalletName(savedName);
       setStage('dashboard');
+      console.debug('[Wallet] stage -> dashboard (open existing)');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to open wallet';
       window.alert(msg);
@@ -88,14 +93,26 @@ export default function App() {
 
   // Handlers: Create (Step 1)
   function continueFromStep1Action() {
-    if (!walletName.trim()) {
+    const name = walletName.trim();
+    if (!name) {
       window.alert('Please enter a wallet name');
       return;
     }
-    // Generate 12 words
-    const m12 = generateMnemonic12();
-    setMnemonic(m12);
-    setStage('create-step2');
+
+    try {
+      const m12 = generateMnemonic12();
+      if (!m12 || typeof m12 !== 'string' || m12.trim().split(/\s+/).length < 12) {
+        window.alert('Failed to generate recovery phrase. Please try again.');
+        return;
+      }
+      setMnemonic(m12);
+      setStage('create-step2');
+      console.debug('[Wallet] stage -> create-step2');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unexpected error on mnemonic generation';
+      console.error('[Wallet] continueFromStep1Action error:', e);
+      window.alert(msg);
+    }
   }
 
   // Handlers: Create (Step 2)
@@ -106,7 +123,7 @@ export default function App() {
       .catch(() => window.alert('Copy failed'));
   }
 
-  // ✅ добавлена защита от пустой mnemonic + нормализация имени
+  // ✅ защита от пустой mnemonic + нормализация имени
   async function finalizeCreateAction() {
     if (!confirmStored) {
       window.alert('Please confirm that you have safely stored your 12-word phrase');
@@ -115,9 +132,15 @@ export default function App() {
     let name = walletName.trim();
     if (!name) name = 'My Wallet';
 
-    let m = mnemonic.trim();
-    if (!m) {
-      m = generateMnemonic12();
+    let m = (mnemonic ?? '').trim();
+    if (!m || m.split(/\s+/).length < 12) {
+      try {
+        m = generateMnemonic12();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to generate recovery phrase';
+        window.alert(msg);
+        return;
+      }
       setMnemonic(m);
     }
 
@@ -131,6 +154,7 @@ export default function App() {
       setAddress(addr);
       setWalletName(name);
       setStage('dashboard');
+      console.debug('[Wallet] stage -> dashboard (created)');
       window.alert('Wallet created successfully. Keep your 12 words safe!');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to create wallet';
@@ -150,6 +174,7 @@ export default function App() {
               {(['Wallet', 'Send', 'Receive', 'Swap'] as const).map((t) => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => setTab(t)}
                   className={`px-4 py-2 rounded-xl font-semibold ${
                     tab === t ? 'bg-[#0A84FF]' : 'bg-[#1F2430] hover:bg-[#242a39]'
@@ -161,7 +186,7 @@ export default function App() {
             </div>
           )}
 
-          <button onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
+          <button type="button" onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
             reset
           </button>
         </div>
@@ -175,18 +200,18 @@ export default function App() {
         <DownloadBanner />
         <div className="rounded-2xl border border-[#2c3344] bg-[#1F2430]/60 p-6">
           <div className="text-2xl font-extrabold">Welcome to GAD Wallet</div>
-          <div className="opacity-80 mt-1">
-            A self-custody wallet for BSC (BNB). Save your 12 words securely.
-          </div>
+          <div className="opacity-80 mt-1">A self-custody wallet for BSC (BNB). Save your 12 words securely.</div>
 
           <div className="grid sm:grid-cols-2 gap-3 mt-6">
             <button
+              type="button"
               onClick={createNewWalletAction}
               className="px-4 py-3 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
             >
               Create new wallet
             </button>
             <button
+              type="button"
               onClick={openExistingWalletAction}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
@@ -215,12 +240,14 @@ export default function App() {
 
           <div className="mt-5 flex gap-3">
             <button
+              type="button"
               onClick={() => setStage('landing')}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
               Back
             </button>
             <button
+              type="button"
               onClick={continueFromStep1Action}
               className="px-4 py-3 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
             >
@@ -233,14 +260,12 @@ export default function App() {
   }
 
   function CreateStep2() {
-    const words = mnemonic.trim().split(/\s+/);
+    const words = (mnemonic || '').trim() ? mnemonic.trim().split(/\s+/) : [];
     return (
       <div className="max-w-5xl mx-auto px-4 py-10 text-white">
         <div className="rounded-2xl border border-[#2c3344] bg-[#1F2430]/60 p-6">
           <div className="text-2xl font-extrabold">Step 2 — Your 12-word recovery phrase</div>
-          <div className="opacity-80 mt-1">
-            Write these words down in order and keep them in a safe place.
-          </div>
+          <div className="opacity-80 mt-1">Write these words down in order and keep them in a safe place.</div>
 
           <div className="grid sm:grid-cols-3 gap-2 mt-5">
             {words.map((w, i) => (
@@ -256,6 +281,7 @@ export default function App() {
 
           <div className="mt-4 flex gap-3">
             <button
+              type="button"
               onClick={copyMnemonicAction}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
@@ -273,12 +299,14 @@ export default function App() {
 
           <div className="mt-5 flex gap-3">
             <button
+              type="button"
               onClick={() => setStage('create-step1')}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
               Back
             </button>
             <button
+              type="button"
               onClick={finalizeCreateAction}
               className="px-4 py-3 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
             >

@@ -3,11 +3,12 @@ import { mnemonicToAccount, generateMnemonic as viemGenerateMnemonic } from 'vie
 import { toHex } from 'viem';
 
 export function generateMnemonic12(): string {
-  // без явного wordlist — viem берёт дефолтный (английский)
+  // Явно передаём undefined для wordlist и 128 бит энтропии → 12 слов
   return viemGenerateMnemonic(undefined, 128);
 }
 
 export function generateMnemonic24(): string {
+  // Явно передаём undefined для wordlist и 256 бит энтропии → 24 слова
   return viemGenerateMnemonic(undefined, 256);
 }
 
@@ -16,7 +17,10 @@ interface HdLike {
   getHdKey(): { privateKey: Uint8Array };
 }
 
-/** Приватный ключ из mnemonic */
+/**
+ * Возвращает приватный ключ (`0x...`) из mnemonic.
+ * Используем getHdKey() -> privateKey (Uint8Array) и toHex для конвертации.
+ */
 export function privateKeyFromMnemonic(mnemonic: string): `0x${string}` {
   const acc = mnemonicToAccount(mnemonic);
   const hdGetter = (acc as unknown as Partial<HdLike>).getHdKey;
@@ -26,20 +30,20 @@ export function privateKeyFromMnemonic(mnemonic: string): `0x${string}` {
   return toHex(pk) as `0x${string}`;
 }
 
-/** derivePrivKey(index не используется в текущей реализации) */
+/** derive private key for given index (index currently not applied) */
 export function derivePrivKey(index: number, mnemonic: string): `0x${string}` {
-  void index;
+  void index; // индекс не используется в текущей реализаци
   return privateKeyFromMnemonic(mnemonic);
 }
 
-/** deriveAddressFromMnemonic (index не используется) */
+/** derive address for given index (index currently not applied) */
 export function deriveAddressFromMnemonic(mnemonic: string, index: number): `0x${string}` {
   void index;
   const acc = mnemonicToAccount(mnemonic);
   return acc.address as `0x${string}`;
 }
 
-/** ensureMnemonic: если есть валидная — вернуть, иначе сгенерировать */
+/** ensure mnemonic: если передано валидное — вернуть, иначе сгенерировать новую */
 export function ensureMnemonic(mnemonic?: string | null): string {
   if (mnemonic && typeof mnemonic === 'string' && mnemonic.trim().split(/\s+/).length >= 12) {
     return mnemonic;
@@ -47,7 +51,7 @@ export function ensureMnemonic(mnemonic?: string | null): string {
   return generateMnemonic12();
 }
 
-/** опционально: hex из строки фиксированного размера */
+/** опционально: hex из одной строки (если где-то нужно) */
 export function toHexUtf8(s: string): `0x${string}` {
   return toHex(s, { size: 32 }) as `0x${string}`;
 }
