@@ -1,8 +1,12 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, GButton } from '../components/UI';
+import type { Address } from 'viem';
+import { formatUnits } from 'viem';
+import { useBalances, type TokenLike } from '@/src/wallet/core/state/useBalances';
 
+// минимальный тип токена для UI (совместим с useBalances)
 type Activity = {
   hash: string;
   type: 'Send' | 'Receive' | 'Swap';
@@ -25,17 +29,81 @@ export default function WalletHome({
   onReceiveAction: () => void;
   onSwapAction: () => void;
 }) {
-  // TODO: заменить на реальные данные из стора/бекенда
-  const balances = useMemo(
-    () => [
-      { symbol: 'BNB' as const, value: '0.0000', fiat: '$0.00' },
-      { symbol: 'GAD' as const, value: '0',      fiat: '$0.00' },
-      { symbol: 'USDT' as const, value: '0.00',  fiat: '$0.00' },
-    ],
-    []
-  );
+  // ---- 1) подтягиваем токен-лист (локальный API, с фоллбеком) ----
+  const [allTokens, setAllTokens] = useState<TokenLike[]>([]);
 
-  // Демонстрационный список (замените при подключении RPC/индексера)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/tokenlist', { cache: 'no-store' });
+        const data = await res.json();
+        const list: TokenLike[] = (data.tokens ?? []).map((t: unknown) => {
+          const tt = t as {
+            address: string;
+            symbol: string;
+            decimals?: number;
+            name?: string;
+          };
+          // допускаем нативный BNB как строку 'BNB'
+          const addr = tt.address === 'BNB' ? 'BNB' : (tt.address as `0x${string}`);
+          return {
+            address: addr,
+            symbol: tt.symbol,
+            decimals: Number(tt.decimals ?? 18),
+          };
+        });
+
+        if (!alive) return;
+
+        // нам для главного экрана нужны минимум BNB/GAD/USDT
+        const pick = (sym: string): TokenLike | null =>
+          list.find((x) => x.symbol?.toUpperCase() === sym.toUpperCase()) ?? null;
+
+        const bnb =
+          pick('BNB') ?? ({ address: 'BNB', symbol: 'BNB', decimals: 18 } as const);
+        const gad =
+          pick('GAD') ??
+          ({ address: '0x858bab88A5b8d7f29a40380C5F2D8d0b8812FE62', symbol: 'GAD', decimals: 18 } as const);
+        const usdt =
+          pick('USDT') ??
+          ({ address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT', decimals: 18 } as const);
+
+        setAllTokens([bnb, gad, usdt]);
+      } catch {
+        // на случай падения API — строгий фоллбек
+        setAllTokens([
+          { address: 'BNB', symbol: 'BNB', decimals: 18 },
+          { address: '0x858bab88A5b8d7f29a40380C5F2D8d0b8812FE62', symbol: 'GAD', decimals: 18 },
+          { address: '0x55d398326f99059fF775485246999027B3197955', symbol: 'USDT', decimals: 18 },
+        ]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // ---- 2) авто-балансы раз в 12 сек (+ ручной рефреш) ----
+  const { loading, balances, refetch } = useBalances(address as Address, allTokens, 12_000);
+
+  // ---- 3) форматирование для карточек ----
+  const cards = useMemo(() => {
+    return allTokens.map((t) => {
+      const raw = balances[t.symbol] ?? 0n;
+      const human = formatUnits(raw, t.decimals);
+      // простая усечённая строка
+      const view =
+        Number.isFinite(Number(human)) && Number(human) < 0.000001
+          ? '0'
+          : Number(human).toLocaleString(undefined, {
+              maximumFractionDigits: 6,
+            });
+      return { symbol: t.symbol as 'BNB' | 'GAD' | 'USDT', value: view, fiat: '$0.00' };
+    });
+  }, [allTokens, balances]);
+
+  // демо-активность (оставляю как была)
   const activity: Activity[] = useMemo(
     () => [
       {
@@ -84,18 +152,26 @@ export default function WalletHome({
           </div>
         )}
 
-        {/* быстрые действия */}
-        <div className="flex gap-2 mt-4">
+        {/* быстрые действия + ручной рефреш */}
+        <div className="flex flex-wrap gap-2 mt-4">
           <GButton title="Send" onClickAction={onSendAction} />
           <GButton title="Receive" onClickAction={onReceiveAction} />
           <GButton title="Swap" onClickAction={onSwapAction} />
+          <button
+            type="button"
+            onClick={refetch}
+            className="px-3 py-2 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+            title="Refresh balances"
+          >
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
         </div>
       </Card>
 
       {/* balances */}
       <Card title="Balances" subtitle="BNB · GAD · USDT">
         <div className="grid sm:grid-cols-3 gap-3">
-          {balances.map((b) => (
+          {cards.map((b) => (
             <div
               key={b.symbol}
               className="rounded-xl bg-[#10141E] border border-[#2c3344] p-4 flex items-center justify-between"
@@ -110,7 +186,7 @@ export default function WalletHome({
         </div>
       </Card>
 
-      {/* recent activity */}
+      {/* recent activity (как было) */}
       <Card title="Recent activity" subtitle="Latest 3 operations">
         <div className="divide-y divide-[#2c3344]">
           {activity.map((tx) => (
