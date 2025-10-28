@@ -6,7 +6,7 @@ import SendScreen from './screens/SendScreen';
 import ReceiveScreen from './screens/ReceiveScreen';
 import SwapScreen from './screens/SwapScreen';
 import type { Address } from 'viem';
-import { deriveAddressFromMnemonic /* generateMnemonic12 */ } from '@wallet/core/services/seed';
+import { deriveAddressFromMnemonic, generateMnemonic12 } from '@wallet/core/services/seed';
 import { getEncryptedMnemonic, setEncryptedMnemonic, clearAll } from '@wallet/adapters/storage.web';
 
 type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap';
@@ -55,15 +55,6 @@ export default function App() {
     []
   );
 
-  // ---------- helper: stable BIP-39 generator via dynamic imports ----------
-  async function generateMnemonic12Safe(): Promise<string> {
-    // Динамически грузим @scure/bip39 и wordlist — это надёжно на Vercel
-    const bip39 = await import('@scure/bip39');
-    const { default: english } = await import('@scure/bip39/wordlists/english.js'); // default: string[]
-    // @scure/bip39.generateMnemonic(wordlist, strength)
-    return bip39.generateMnemonic(english as unknown as string[], 128);
-  }
-
   // Handlers: Landing
   function createNewWalletAction() {
     setWalletName('');
@@ -97,15 +88,15 @@ export default function App() {
   }
 
   // Handlers: Create (Step 1)
-  async function continueFromStep1Action() {
+  function continueFromStep1Action() {
     const name = walletName.trim();
     if (!name) {
       window.alert('Please enter a wallet name');
       return;
     }
     try {
-      // ⬇️ Генерим 12 слов через @scure/bip39 + english wordlist
-      const m12 = await generateMnemonic12Safe();
+      // ⬇️ Генерация 12 слов через стабильный генератор из seed.ts (ethers внутри)
+      const m12 = generateMnemonic12();
       if (!m12 || m12.trim().split(/\s+/).length < 12) {
         window.alert('Failed to generate recovery phrase. Please try again.');
         return;
@@ -138,8 +129,9 @@ export default function App() {
 
     let m = (mnemonic ?? '').trim();
     if (!m || m.split(/\s+/).length < 12) {
+      // подстраховка — генерим прямо здесь
       try {
-        m = await generateMnemonic12Safe(); // ⬅️ та же стабильная генерация
+        m = generateMnemonic12();
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Failed to generate recovery phrase';
         window.alert(msg);
@@ -235,13 +227,13 @@ export default function App() {
           <div className="text-2xl font-extrabold">Step 1 — Name your wallet</div>
           <div className="opacity-80 mt-1">You can change it later.</div>
 
-        <input
-          value={walletName}
-          onChange={(e) => setWalletName(e.currentTarget.value)}
-          className="mt-5 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
-          placeholder="Wallet name"
-          autoFocus
-        />
+          <input
+            value={walletName}
+            onChange={(e) => setWalletName(e.currentTarget.value)}
+            className="mt-5 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
+            placeholder="Wallet name"
+            autoFocus
+          />
 
           <div className="mt-5 flex gap-3">
             <button
