@@ -22,7 +22,6 @@ export default function FarmpausePage() {
       </div>
 
       <section className="mt-8">
-        {/* Весь клиентский код — внутри ClientLegacy */}
         <ClientLegacy />
       </section>
     </main>
