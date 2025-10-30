@@ -1,17 +1,11 @@
-import dynamic from 'next/dynamic';
 import React from 'react';
 import type { Metadata } from 'next';
+import ClientLegacy from './ClientLegacy';
 
-// noindex для этой страницы
 export const metadata: Metadata = {
   title: 'Legacy GAD Single Staking (Farmpause)',
   robots: { index: false, follow: false },
 };
-
-// В App Router нельзя указывать { ssr: false } на серверной странице
-const GADStaking = dynamic(() => import('../components/GADStaking'), {
-  loading: () => <div className="mt-6 text-sm text-white/60">Loading legacy single-staking…</div>,
-});
 
 export default function FarmpausePage() {
   return (
@@ -28,8 +22,8 @@ export default function FarmpausePage() {
       </div>
 
       <section className="mt-8">
-        {/* Старый сингл-стейкинг, адрес берётся из компонента GADStaking.tsx */}
-        <GADStaking />
+        {/* Весь клиентский код — внутри ClientLegacy */}
+        <ClientLegacy />
       </section>
     </main>
   );
