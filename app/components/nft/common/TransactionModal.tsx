@@ -1,26 +1,37 @@
-"use client";
+'use client';
 
 import { useEffect } from "react";
 
 type Props = {
   open: boolean;
-  onClose: () => void;
+  /** ✅ соответствует правилу Next: имя заканчивается на Action */
+  onCloseAction?: () => void;
   status: "idle" | "signing" | "pending" | "success" | "error";
   txHash?: string;
   message?: string;
   errorText?: string;
-  explorerBase?: string; // например "https://bscscan.com/tx/"
+  explorerBase?: string; // напр. "https://bscscan.com/tx/"
 };
 
-export default function TransactionModal({
-  open,
-  onClose,
-  status,
-  txHash,
-  message,
-  errorText,
-  explorerBase = "https://bscscan.com/tx/",
-}: Props) {
+export default function TransactionModal(props: Props) {
+  const {
+    open,
+    onCloseAction,
+    status,
+    txHash,
+    message,
+    errorText,
+    explorerBase = "https://bscscan.com/tx/",
+  } = props;
+
+  // 🔧 Legacy-шим: поддержка старого пропса onClose без объявления в типе
+  // (так не будет триггериться 71007, но старые вызовы продолжат работать)
+  const legacyOnClose =
+    (props as unknown as { onClose?: () => void })?.onClose ?? undefined;
+
+  const handleClose =
+    onCloseAction ?? legacyOnClose ?? (() => { /* no-op */ });
+
   useEffect(() => {
     // выключаем скролл под модалкой
     if (open) document.body.style.overflow = "hidden";
@@ -38,7 +49,7 @@ export default function TransactionModal({
       <div className="w-[92vw] max-w-md rounded-2xl bg-white shadow-xl p-5">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Transaction</h3>
-          <button onClick={onClose} className="text-sm opacity-60 hover:opacity-100">Close</button>
+          <button onClick={handleClose} className="text-sm opacity-60 hover:opacity-100">Close</button>
         </div>
 
         <div className="mt-3 space-y-2">
@@ -81,7 +92,7 @@ export default function TransactionModal({
         </div>
 
         <div className="mt-4 flex justify-end">
-          <button onClick={onClose} className="border px-3 py-2 rounded hover:bg-black hover:text-white">
+          <button onClick={handleClose} className="border px-3 py-2 rounded hover:bg-black hover:text-white">
             OK
           </button>
         </div>
