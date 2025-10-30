@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const GADStaking = dynamic(() => import('../components/GADStaking'), { ssr: false });
+// В App Router нельзя указывать { ssr: false } на серверной странице
+const GADStaking = dynamic(() => import('../components/GADStaking'), {
+  loading: () => <div className="mt-6 text-sm text-white/60">Loading legacy single-staking…</div>,
+});
 
 export default function FarmpausePage() {
   return (

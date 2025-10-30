@@ -6,9 +6,12 @@ import React from 'react';
 const FarmingDashboard = dynamic(() => import('../components/FarmingDashboard'), { ssr: false });
 const ZapBox           = dynamic(() => import('../components/ZapBox'),           { ssr: false });
 const HowToFarm        = dynamic(() => import('../components/HowToFarm'),        { ssr: false });
+const GADLocker        = dynamic(() => import('../components/GADLocker').catch(() => null), { ssr: false });
 
-// если компонент стейкинга есть — отрендерится; если нет — страница не ломается
-const GADStaking = dynamic(() => import('../components/GADStaking').catch(() => null), { ssr: false });
+const GAD_TOKEN = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
+const MASTERCHEF = '0x5C5c0b9eE66CC106f90D7b1a3727dc126C4eF188';
+const ZAP = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC';
+const LOCKER = (process.env.NEXT_PUBLIC_GAD_LOCKER_ADDRESS || '0xYOUR_NEW_LOCKER_ADDRESS').trim();
 
 export default function EarnPage() {
   return (
@@ -24,56 +27,56 @@ export default function EarnPage() {
         <p>
           GAD Token:{' '}
           <a
-            href="https://bscscan.com/token/0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62"
+            href={`https://bscscan.com/token/${GAD_TOKEN}`}
             target="_blank" rel="noreferrer"
             className="text-[#ffd166] hover:underline"
           >
-            0x858bab...FE62
+            {GAD_TOKEN.slice(0,8)}…{GAD_TOKEN.slice(-4)}
           </a> ✅
         </p>
         <p>
           MasterChef (Farming):{' '}
           <a
-            href="https://bscscan.com/address/0x5C5c0b9eE66CC106f90D7b1a3727dc126C4eF188"
+            href={`https://bscscan.com/address/${MASTERCHEF}`}
             target="_blank" rel="noreferrer"
             className="text-[#ffd166] hover:underline"
           >
-            0x5C5c0b...F188
+            {MASTERCHEF.slice(0,8)}…{MASTERCHEF.slice(-4)}
           </a> ✅
         </p>
         <p>
           Zap Contract:{' '}
           <a
-            href="https://bscscan.com/address/0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC"
+            href={`https://bscscan.com/address/${ZAP}`}
             target="_blank" rel="noreferrer"
             className="text-[#ffd166] hover:underline"
           >
-            0x15Acdc...99BC
+            {ZAP.slice(0,8)}…{ZAP.slice(-4)}
           </a> ✅
         </p>
         <p>
-          Staking (single GAD):{' '}
+          Staking (single GAD, Locker v1):{' '}
           <a
-            href="https://bscscan.com/address/0x0271167c2b1b1513434ECe38f024434654781594"
+            href={`https://bscscan.com/address/${LOCKER}`}
             target="_blank" rel="noreferrer"
             className="text-[#ffd166] hover:underline"
           >
-            0x027116...1594
+            {LOCKER.slice(0,8)}…{LOCKER.slice(-4)}
           </a> ✅
         </p>
       </div>
 
-      {/* ==== GAD SINGLE STAKING (переставлено ВЫШЕ Zap) ==== */}
+      {/* ==== GAD LOCKER (новый single staking) ==== */}
       <section className="mt-10 bg-white/5 border border-white/10 rounded-2xl p-6">
         <h2 className="text-2xl font-bold">Stake GAD → Earn GAD</h2>
         <p className="text-white/80 mt-2">
-          Lock <b>0d ×1.0</b> / <b>30d ×1.5</b> / <b>90d ×2.5</b> / <b>180d ×3.5</b>. No LP needed — stake GAD directly.
+          Lock periods & APR are read on-chain from the new locker contract. No LP needed — stake GAD directly.
         </p>
 
-        {GADStaking ? (
+        {GADLocker ? (
           <div className="mt-6">
             {/* @ts-ignore: dynamic import may return null at build-time */}
-            <GADStaking />
+            <GADLocker />
           </div>
         ) : null}
       </section>
