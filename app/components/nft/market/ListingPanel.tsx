@@ -99,7 +99,7 @@ export default function ListingPanel({ nft, tokenId }: { nft: string; tokenId: s
 
       <TransactionModal
         open={open}
-        onClose={() => setOpen(false)}
+        onCloseAction={() => setOpen(false)}
         status={status}
         txHash={txHash}
         message={status === "signing" ? "Sign the transaction in wallet" : undefined}

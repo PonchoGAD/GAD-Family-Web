@@ -65,7 +65,7 @@ export default function ApproveForAllButton({ nft }: { nft: string }) {
 
       <TransactionModal
         open={open}
-        onClose={() => setOpen(false)}
+        onCloseAction={() => setOpen(false)}
         status={status}
         txHash={txHash}
         message="Approving marketplace to manage your NFTs"

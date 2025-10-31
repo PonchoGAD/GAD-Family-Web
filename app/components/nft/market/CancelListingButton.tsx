@@ -62,7 +62,7 @@ export default function CancelListingButton(props: Props) {
 
       <TransactionModal
         open={open}
-        onClose={() => setOpen(false)}
+        onCloseAction={() => setOpen(false)}
         status={status}
         txHash={txHash}
         message="Delist your NFT from marketplace"
