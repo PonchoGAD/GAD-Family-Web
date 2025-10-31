@@ -11,7 +11,7 @@ const GADLocker        = dynamic(() => import('../components/GADLocker').catch((
 const GAD_TOKEN = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62';
 const MASTERCHEF = '0x5C5c0b9eE66CC106f90D7b1a3727dc126C4eF188';
 const ZAP = '0x15Acdc7636FB0214aEfa755377CE5ab3a9Cc99BC';
-const LOCKER = (process.env.NEXT_PUBLIC_GAD_LOCKER_ADDRESS || '0xYOUR_NEW_LOCKER_ADDRESS').trim();
+const LOCKER = (process.env.NEXT_PUBLIC_GAD_LOCKER_ADDRESS || '0x2479158bFA2a0F164E7a1B9b7CaF8d3Ea2307ea1').trim();
 
 export default function EarnPage() {
   return (
