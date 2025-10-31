@@ -23,6 +23,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
   const [account, setAccount] = React.useState<string | null>(null);
   const [chainId, setChainId] = React.useState<number | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState<string>("");
 
   React.useEffect(() => {
     const eth = getEth();
@@ -67,10 +68,14 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
 
   const connect = async () => {
     const eth = getEth();
-    if (!eth) return alert("Please install MetaMask");
+    if (!eth) {
+      setMsg("Please install MetaMask");
+      return;
+    }
 
     try {
       setBusy(true);
+      setMsg("");
       const accounts = await eth.request({ method: "eth_requestAccounts" }) as string[];
       if (!accounts?.length) return;
 
@@ -89,8 +94,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
       onConnectedAction?.(addr, signer);
     } catch (e: unknown) {
       const er = e as { message?: string };
-      console.error(e);
-      alert(er?.message ?? "Failed to connect");
+      setMsg(er?.message ?? "Failed to connect");
     } finally {
       setBusy(false);
     }
@@ -103,7 +107,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
 
   return (
     <div className={className ?? ""}>
-      <div className="flex items-center justify-center gap-3 mt-6">
+      <div className="flex items-center justify-center gap-3 mt-2">
         {account ? (
           <>
             <span className="text-sm text-white/70">
@@ -127,6 +131,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
           </button>
         )}
       </div>
+      {msg && <div className="text-xs text-red-400 text-center mt-2">{msg}</div>}
     </div>
   );
 }

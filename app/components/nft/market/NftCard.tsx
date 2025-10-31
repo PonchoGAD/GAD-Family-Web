@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { ethers, type Eip1193Provider } from "ethers";
+import Image from "next/image";
+import { ethers, type Eip1193Provider, Contract } from "ethers";
 import { getReadProvider } from "../../../lib/nft/eth";
 import { ADDR } from "../../../lib/nft/config";
 import { nft721Abi } from "../../../lib/nft/abis/nft721";
@@ -11,8 +12,10 @@ type Props = {
   nft: string;
   tokenId: string;
   seller: string;
-  currency: string; // address(0)=BNB else USDT
-  price: string; // in wei
+  /** address(0)=BNB, иначе адрес валюты (наша логика — USDT) */
+  currency: string;
+  /** Цена в wei (строка). */
+  price: string;
 };
 
 type EIP1193 = Eip1193Provider & {
@@ -24,50 +27,56 @@ function getEth(): EIP1193 | undefined {
   return (window as unknown as { ethereum?: EIP1193 }).ethereum;
 }
 
+const IPFS_GATEWAY =
+  process.env.NEXT_PUBLIC_IPFS_GATEWAY?.replace(/\/$/, "") ||
+  "https://gateway.pinata.cloud/ipfs";
+
+function ipfsToHttp(u: string): string {
+  if (!u) return u;
+  if (u.startsWith("ipfs://")) {
+    return `${IPFS_GATEWAY}/${u.replace("ipfs://", "")}`;
+  }
+  return u;
+}
+
 export default function NftCard({ nft, tokenId, seller, currency, price }: Props) {
   const [img, setImg] = React.useState<string | null>(null);
-  const [name, setName] = React.useState<string | null>(null);
+  const [name, setName] = React.useState<string>(`NFT #${tokenId}`);
   const [loading, setLoading] = React.useState(false);
   const [msg, setMsg] = React.useState("");
 
-  // --- Load tokenURI metadata ---
+  // Загружаем метаданные tokenURI
   React.useEffect(() => {
+    let mounted = true;
     (async () => {
       try {
         const provider = await getReadProvider();
-        const nftc = new ethers.Contract(nft, nft721Abi, provider);
-        const uri: string = await nftc.tokenURI(tokenId);
+        const nftc = new Contract(nft, nft721Abi, provider);
+        const uri: string = await nftc.tokenURI(tokenId).catch(() => "");
 
-        let url = uri;
-        if (uri.startsWith("ipfs://")) {
-          url =
-            (process.env.NEXT_PUBLIC_IPFS_GATEWAY ||
-              "https://gateway.pinata.cloud/ipfs/") +
-            uri.replace("ipfs://", "");
-        }
+        if (!uri) return;
 
-        const r = await fetch(url);
-        const meta = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-        const imgVal = meta?.image as string | undefined;
+        const url = ipfsToHttp(uri);
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return;
 
-        if (imgVal) {
-          let im = imgVal;
-          if (im.startsWith("ipfs://")) {
-            im =
-              (process.env.NEXT_PUBLIC_IPFS_GATEWAY ||
-                "https://gateway.pinata.cloud/ipfs/") +
-              im.replace("ipfs://", "");
-          }
-          setImg(im);
-        }
-        setName((meta?.name as string | undefined) || `NFT #${tokenId}`);
+        const meta = (await r.json()) as Record<string, unknown>;
+        const mImage = typeof meta.image === "string" ? ipfsToHttp(meta.image) : null;
+        const mName = typeof meta.name === "string" ? meta.name : `NFT #${tokenId}`;
+
+        if (!mounted) return;
+        if (mImage) setImg(mImage);
+        setName(mName);
       } catch {
-        setName(`#${tokenId}`);
+        // swallow
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, [nft, tokenId]);
 
-  // --- Buy NFT ---
   const buy = async () => {
     setLoading(true);
     setMsg("");
@@ -77,27 +86,36 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
 
       const provider = new ethers.BrowserProvider(eth);
       const signer = await provider.getSigner();
-      const mkt = new ethers.Contract(ADDR.MARKETPLACE, marketplaceAbi, signer);
+      const mkt = new Contract(ADDR.MARKETPLACE, marketplaceAbi, signer);
+
+      const priceWei = BigInt(price || "0");
 
       if (currency === ethers.ZeroAddress) {
-        // BNB buy
-        const tx = await mkt.buy(nft, tokenId, seller, { value: price });
+        // покупка за BNB
+        const tx = await mkt.buy(nft, tokenId, seller, { value: priceWei });
         await tx.wait();
       } else {
-        // USDT buy
-        const usdt = new ethers.Contract(
+        // покупка за USDT: approve -> buy
+        const erc20 = new Contract(
           ADDR.USDT,
           ["function approve(address spender,uint256 value) external returns (bool)"],
           signer
         );
-        await usdt.approve(ADDR.MARKETPLACE, price);
+        const ap = await erc20.approve(ADDR.MARKETPLACE, priceWei);
+        await ap.wait();
+
         const tx = await mkt.buy(nft, tokenId, seller);
         await tx.wait();
       }
       setMsg("✅ Purchase successful!");
-    } catch (e: unknown) {
-      const er = e as { message?: string };
-      setMsg(er?.message || "Buy failed");
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Buy failed";
+      setMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -105,7 +123,7 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
 
   const fmt = (v: string) => {
     try {
-      return ethers.formatEther(v);
+      return ethers.formatEther(BigInt(v || "0"));
     } catch {
       return v;
     }
@@ -113,12 +131,15 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
 
   return (
     <div className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 flex flex-col">
-      <div className="aspect-square bg-black/30">
+      <div className="relative aspect-square bg-black/30">
         {img ? (
-          <img
+          <Image
             src={img}
-            alt={name || ""}
-            className="w-full h-full object-cover"
+            alt={name}
+            fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 20vw"
+            className="object-cover"
+            priority={false}
           />
         ) : null}
       </div>
@@ -127,7 +148,7 @@ export default function NftCard({ nft, tokenId, seller, currency, price }: Props
         <div className="text-sm text-white/60">
           {nft.slice(0, 6)}…{nft.slice(-4)} · #{tokenId}
         </div>
-        <div className="text-lg font-semibold mt-1">{name || `#${tokenId}`}</div>
+        <div className="text-lg font-semibold mt-1">{name}</div>
         <div className="text-sm text-white/60 mt-1">
           Seller: {seller.slice(0, 6)}…{seller.slice(-4)}
         </div>

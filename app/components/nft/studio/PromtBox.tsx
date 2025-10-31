@@ -3,17 +3,19 @@
 import { useState } from "react";
 
 export default function PromptBox({
-  onGenerate,
+  onGenerateAction,
   disabled,
 }: {
-  onGenerate: (prompt: string) => void;
+  /** ✅ имя оканчивается на Action — соответствует TS71007 */
+  onGenerateAction: (prompt: string) => void;
   disabled?: boolean;
 }) {
   const [text, setText] = useState("");
 
   const submit = () => {
-    if (!text.trim()) return;
-    onGenerate(text.trim());
+    const v = text.trim();
+    if (!v) return;
+    onGenerateAction(v);
   };
 
   return (

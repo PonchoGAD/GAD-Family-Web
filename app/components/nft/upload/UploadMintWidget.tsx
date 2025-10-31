@@ -1,7 +1,7 @@
-// app/nft/components/nft/upload/UploadMintWidget.tsx
 "use client";
 
 import { useState } from "react";
+import Image from "next/image"; // ✅ добавили
 import { ethers } from "ethers";
 import { ADDR } from "../../../lib/nft/config";
 import { getSigner } from "../../../lib/nft/eth";
@@ -27,41 +27,34 @@ export default function UploadMintWidget() {
     const res = await fetch("/nft/api/mint", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      // ⚠️ здесь остаётся текущий контракт API. Если сервер ждёт imageUrl, можно поменять ключ на imageUrl.
       body: JSON.stringify({ imageBase64: fileDataUrl, name, description }),
     });
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      throw new Error((j as { error?: string })?.error || "Upload failed");
+      const j = await res.json().catch(() => ({} as { error?: string }));
+      throw new Error(j?.error || "Upload failed");
     }
     return (await res.json()) as UploadResp;
   };
 
   const detectMintFee = async (c721: ethers.Contract): Promise<bigint> => {
     const candidates = ["mintFeeWei", "mintFee", "MINT_FEE", "fee"] as const;
-
     for (const fn of candidates) {
       try {
-        // динамический, но типобезопасный вызов
         const maybe = (c721 as unknown as Record<string, unknown>)[fn];
         if (typeof maybe === "function") {
           const v = (await (maybe as () => Promise<unknown>)()) as unknown;
-
           if (typeof v === "bigint") return v;
-
           if (typeof v === "object" && v !== null) {
-            // поддержка BigNumber-подобных
             const s = (v as { toString?: () => string }).toString?.();
             if (typeof s === "string") return BigInt(s);
           }
         }
-      } catch {
-        // пробуем следующий кандидат
-      }
+      } catch { /* try next */ }
     }
     return ethers.parseEther("0.01");
   };
 
-  // перегрузки mintWithFee без any
   type MintWithFee1 = (tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
   type MintWithFee2 = (to: string, tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
 
@@ -83,21 +76,16 @@ export default function UploadMintWidget() {
 
       let tx: ethers.TransactionResponse;
       try {
-        // вариант: mintWithFee(string)
         tx = await (mwf as MintWithFee1)(tokenUri, { value: fee });
       } catch {
-        // вариант: mintWithFee(address,string)
         const to = await signer.getAddress();
         tx = await (mwf as MintWithFee2)(to, tokenUri, { value: fee });
       }
 
       await tx.wait();
-
       setStatus("Minted ✅");
       alert("Minted ✅");
     } catch (e: unknown) {
-      // eslint-disable-next-line no-console
-      console.error(e);
       const msg =
         e instanceof Error
           ? e.message
@@ -116,13 +104,20 @@ export default function UploadMintWidget() {
       <div className="grid md:grid-cols-2 gap-4">
         <div className="border rounded p-3 space-y-3">
           <div className="font-semibold">1) Image</div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => onFile(e.target.files?.[0])}
-          />
+          <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} />
           {fileDataUrl && (
-            <img src={fileDataUrl} alt="preview" className="rounded border" />
+            <div className="rounded border overflow-hidden">
+              {/* ✅ next/image вместо img; для data URL ставим фиксированный размер и unoptimized */}
+              <Image
+                src={fileDataUrl}
+                alt="preview"
+                width={512}
+                height={512}
+                className="w-full h-auto"
+                unoptimized
+                priority
+              />
+            </div>
           )}
         </div>
 

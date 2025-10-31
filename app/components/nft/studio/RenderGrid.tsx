@@ -4,11 +4,12 @@ import Image from "next/image";
 
 export default function RenderGrid({
   images,
-  onSelect,
+  onSelectAction,
   selected,
 }: {
   images: string[];
-  onSelect: (url: string) => void;
+  /** ✅ имя оканчивается на Action — соответствует TS71007 */
+  onSelectAction: (url: string) => void;
   selected?: string;
 }) {
   return (
@@ -16,12 +17,13 @@ export default function RenderGrid({
       {images.map((url, i) => (
         <button
           key={i}
-          onClick={() => onSelect(url)}
+          onClick={() => onSelectAction(url)}
           className={`relative border rounded overflow-hidden ${
             selected === url
               ? "border-mint-400 shadow-[0_0_10px_#80FFD3]"
               : "border-gray-700"
           }`}
+          title="Use this image"
         >
           <Image
             src={url}
@@ -29,6 +31,8 @@ export default function RenderGrid({
             width={400}
             height={400}
             className="object-cover w-full h-full"
+            unoptimized
+            priority={i < 3}
           />
         </button>
       ))}

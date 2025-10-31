@@ -26,36 +26,57 @@ export default function OfferPanel({
   const sendOffer = async () => {
     try {
       setBusy(true);
-      const tx = await buyItem(nft, tokenId, seller, currency, ethers.parseEther(offerPrice));
-      setHash(tx?.hash);
-      alert("Offer sent!");
+      const tx = await buyItem(
+        nft,
+        tokenId,
+        seller,
+        currency,
+        ethers.parseEther(offerPrice)
+      );
+      setHash(tx?.hash ?? null);
+      alert("✅ Offer submitted successfully!");
     } catch (e: unknown) {
-      const er = e as { message?: string };
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Offer failed";
+      // eslint-disable-next-line no-console
       console.error(e);
-      alert(er?.message ?? "Offer failed");
+      alert(msg);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="border rounded p-3 mt-4 bg-[#0E0E12]/80 text-white">
-      <div className="font-semibold mb-2">Make an Offer</div>
+    <div className="border rounded-xl p-4 mt-4 bg-white/5 text-white">
+      <div className="font-semibold mb-2">💰 Make an Offer</div>
+
       <input
         type="text"
-        placeholder="Price"
+        placeholder="Price in BNB"
         value={offerPrice}
-        onChange={(e) => setOfferPrice(e.target.value)}
-        className="border rounded px-3 py-2 w-full bg-transparent mb-2"
+        onChange={(e) => setOfferPrice(e.target.value.replace(",", "."))}
+        className="border border-white/10 rounded-lg px-3 py-2 w-full bg-transparent text-sm outline-none focus:border-white/30 mb-3"
       />
+
       <button
         onClick={sendOffer}
         disabled={busy}
-        className="border border-blue-500 text-blue-400 rounded px-3 py-2 hover:bg-blue-500 hover:text-black transition w-full"
+        className="w-full border border-blue-400 text-blue-300 rounded-lg px-3 py-2 font-semibold hover:bg-blue-500 hover:text-black transition disabled:opacity-50"
       >
-        {busy ? "Sending..." : `Offer ${offerPrice} ${currency}`}
+        {busy
+          ? "Sending..."
+          : `Offer ${offerPrice} ${currency === "BNB" ? "BNB" : "USDT"}`}
       </button>
-      <TxToast hash={hash} explorerBase={DEFAULT_CHAIN.explorer} onClose={() => setHash(null)} />
+
+      <TxToast
+        hash={hash}
+        explorerBase={`${DEFAULT_CHAIN.explorer}/tx/`}
+        onCloseAction={() => setHash(null)}
+      />
     </div>
   );
 }

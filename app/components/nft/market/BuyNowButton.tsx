@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { buyItem } from "../../../lib/nft/sdk";
 import { ethers } from "ethers";
+import { buyItem } from "../../../lib/nft/sdk";
 import { DEFAULT_CHAIN } from "../../../lib/nft/chains";
 import TxToast from "../common/TxToast";
 
@@ -26,10 +26,16 @@ export default function BuyNowButton({
     try {
       setBusy(true);
       const tx = await buyItem(nft, tokenId, seller, currency, priceWei);
-      setHash(tx?.hash);
-      alert("Purchase completed!");
+      setHash(tx?.hash ?? null);
+      alert("✅ Purchase completed successfully!");
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Buy failed";
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null && "message" in e
+          ? String((e as { message?: unknown }).message)
+          : "Buy failed";
+      // eslint-disable-next-line no-console
       console.error(e);
       alert(msg);
     } finally {
@@ -38,16 +44,22 @@ export default function BuyNowButton({
   };
 
   return (
-    <>
+    <div className="mt-4">
       <button
         onClick={buy}
         disabled={busy}
-        className="border border-green-500 text-green-400 rounded px-3 py-2 hover:bg-green-500 hover:text-black transition w-full"
+        className="w-full border border-green-500 text-green-400 rounded-lg px-3 py-2 font-semibold hover:bg-green-500 hover:text-black transition disabled:opacity-50"
       >
-        {busy ? "Processing..." : `Buy Now (${ethers.formatEther(priceWei)} ${currency})`}
+        {busy
+          ? "Processing..."
+          : `Buy Now (${ethers.formatEther(priceWei)} ${currency})`}
       </button>
 
-      <TxToast hash={hash} explorerBase={DEFAULT_CHAIN.explorer} onClose={() => setHash(null)} />
-    </>
+      <TxToast
+        hash={hash}
+        explorerBase={`${DEFAULT_CHAIN.explorer}/tx/`}
+        onCloseAction={() => setHash(null)}
+      />
+    </div>
   );
 }

@@ -24,6 +24,7 @@ export default function MintDialog({
 
   const handleMint = async () => {
     try {
+      if (!image) { alert("Please select or generate an image first"); return; }
       setBusy(true);
       const metadata = { name, description: desc, image };
       const { url } = await pinJSON(metadata);
@@ -55,7 +56,7 @@ export default function MintDialog({
   };
 
   return (
-    <div className="border rounded p-3 mt-4 bg-[#0E0E12]/80 text-white">
+    <div className="border rounded-xl p-4 mt-4 bg-[#0E0E12]/80 text-white">
       <div className="font-semibold text-lg mb-2">Mint Generated NFT</div>
       <input
         className="border rounded px-3 py-2 w-full bg-transparent mb-2"
@@ -73,14 +74,14 @@ export default function MintDialog({
       <button
         onClick={handleMint}
         disabled={busy}
-        className="border border-gold-500 text-gold-300 rounded px-4 py-2 hover:bg-gold-500 hover:text-black transition w-full"
+        className="border border-[#FFD166] text-[#FFD166] rounded px-4 py-2 hover:bg-[#FFD166] hover:text-black transition w-full"
       >
         {busy ? "Minting…" : "Mint to Wallet"}
       </button>
       <TxToast
         hash={hash}
         explorerBase={DEFAULT_CHAIN.explorer}
-        onClose={() => setHash(null)}
+        onCloseAction={() => setHash(null)}
       />
     </div>
   );
