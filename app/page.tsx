@@ -500,3 +500,4 @@ function Footer(): ReactElement {
     </footer>
   );
 }
+
