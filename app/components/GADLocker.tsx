@@ -10,15 +10,17 @@ import {
   type Eip1193Provider,
 } from 'ethers';
 
-// ======== АДРЕСА (строго токен + локкер) ========
-const GAD_ADDRESS    = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62'; // GAD ERC-20
-const LOCKER_ADDRESS = (process.env.NEXT_PUBLIC_GAD_LOCKER_ADDRESS || '').trim(); // GADSingleStakeLocker
+// ======== ADDRESSES (token + locker only) ========
+const GAD_ADDRESS = '0x858bab88A5b8D7F29a40380C5F2D8d0b8812FE62'; // GAD ERC-20
+// Prefer .env; fallback to your locker for safety if env is missing
+const LOCKER_ADDRESS = (process.env.NEXT_PUBLIC_GAD_LOCKER_ADDRESS?.trim() ||
+  '0x2479158bFA2a0F164E7a1B9b7CaF8d3Ea2307ea1');
 
-// ======== СЕТЬ / RPC ========
+// ======== NETWORK / RPC ========
 const BSC_CHAIN_ID   = 56;
 const PUBLIC_BSC_RPC = 'https://bsc-dataseed.binance.org/';
 
-// ======== ABI (минимально нужные) ========
+// ======== Minimal ABIs ========
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
   'function balanceOf(address) view returns (uint256)',
@@ -46,9 +48,9 @@ const LOCKER_ABI = [
 ];
 
 type EIP1193 = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
-
 const getEth = () => (window as unknown as { ethereum?: EIP1193 }).ethereum;
 
+// utils
 const fmt = (n: string | bigint, d = 18, max = 6) => {
   try { return Number(formatUnits(n, d)).toLocaleString(undefined, { maximumFractionDigits: max }); }
   catch { return '0'; }
@@ -83,15 +85,10 @@ export default function GADLocker() {
   const [cap, setCap]           = React.useState<string>('0');
   const [staked, setStaked]     = React.useState<string>('0');
 
-  const [toast, setToast]       = React.useState<string>(''); // короткие сообщения (вкл. индикатор частичной выплаты)
+  const [toast, setToast]       = React.useState<string>(''); // short notices (incl. partial payout hint)
   const [err, setErr]           = React.useState<string>('');
 
-  // ensure locker address exists
-  React.useEffect(() => {
-    if (!LOCKER_ADDRESS) setErr('Locker address is not configured. Set NEXT_PUBLIC_GAD_LOCKER_ADDRESS in .env');
-  }, []);
-
-  // read-only провайдер
+  // read-only provider for public view
   React.useEffect(() => {
     if (!provider) setProvider(new JsonRpcProvider(PUBLIC_BSC_RPC));
   }, [provider]);
@@ -138,7 +135,7 @@ export default function GADLocker() {
 
       const lks = (await locker.getLockOptions()) as LockOption[];
       const sorted = [...lks].sort((a, b) => Number(a.duration) - Number(b.duration));
-      setLocks(sorted);
+      setLocks(sorted); // typically 4: 30/60/90/180 days
 
       if (account) {
         const list = (await locker.positionsOf(account)) as Position[];
@@ -189,21 +186,21 @@ export default function GADLocker() {
       </div>
 
       <p className="text-white/80 mt-2">
-        APR и сроки подтягиваются с ончейна. Вывод возможен только после окончания лока.
+        APR and lock periods are read on-chain. Withdrawals are available only after the lock ends.
       </p>
 
       {err && <div className="mt-3 text-red-400 text-sm">{err}</div>}
       {toast && <div className="mt-3 text-xs text-yellow-300/90">{toast}</div>}
 
-      {/* Кап / суммарный стейк / адреса */}
+      {/* Cap / totals / addresses */}
       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <Stat label="Your total staked (GAD)" value={staked} />
-        <Stat label="User cap (GAD)" value={cap} />
+        <Stat label="Per-wallet cap (GAD)" value={cap} />
         <Stat label="Locker" value={LOCKER_ADDRESS ? `${LOCKER_ADDRESS.slice(0,8)}…${LOCKER_ADDRESS.slice(-4)}` : '—'} />
         <Stat label="Token"  value={`${GAD_ADDRESS.slice(0,8)}…${GAD_ADDRESS.slice(-4)}`} />
       </div>
 
-      {/* Карточки локов */}
+      {/* Lock cards (4 windows from on-chain config) */}
       <div className="mt-6 grid md:grid-cols-2 gap-6">
         {locks.map((lk, idx) => (
           <LockCard
@@ -218,7 +215,7 @@ export default function GADLocker() {
         ))}
       </div>
 
-      {/* Позиции + claimAll */}
+      {/* Positions + claimAll */}
       {positions.length > 0 && (
         <div className="mt-10">
           <div className="flex items-center justify-between mb-3">
@@ -231,11 +228,11 @@ export default function GADLocker() {
                   const signer = await (provider as BrowserProvider).getSigner();
                   const locker = new Contract(LOCKER_ADDRESS, LOCKER_ABI, signer);
                   await (await locker.claimAll()).wait();
-                  // Проверим, остался ли pending у какой-то позиции → если да, покажем, что выплата могла быть частичной
+                  // If rewards pool is temporarily low, show a partial payout notice
                   await new Promise(r => setTimeout(r, 1200));
                   await refresh();
                   const stillPending = Object.values(pending).some(v => Number(v) > 0);
-                  setToast(stillPending ? 'ClaimAll: частичная выплата (пул наград временно ограничен)' : 'ClaimAll: успешно');
+                  setToast(stillPending ? 'ClaimAll: partial payout (rewards pool limited temporarily)' : 'ClaimAll: success');
                 } catch (e) {
                   const er = e as { message?: string };
                   setToast(er?.message || 'ClaimAll failed');
@@ -400,7 +397,7 @@ function PositionCard({
       const signer  = await (provider as BrowserProvider).getSigner();
       const locker  = new Contract(LOCKER_ADDRESS, LOCKER_ABI, signer);
 
-      // измерим pending до клейма, затем после — чтобы показать «частичная выплата»
+      // measure pending before/after to show "partial payout" notice
       const pendingBefore = await locker.pendingRewardsByPosition(await signer.getAddress(), id);
       const tx = await locker.claim(id);
       await tx.wait();
@@ -410,7 +407,7 @@ function PositionCard({
 
       setMsg('Harvested');
       if (pendingAfter > 0n && pendingAfter >= pendingBefore / 10n) {
-        setToast('Частичная выплата по позиции — свободный пул наград временно ограничен');
+        setToast('Partial payout — rewards pool is temporarily limited');
       }
       await onAfterAction();
     } catch (e) {
@@ -452,7 +449,7 @@ function PositionCard({
     } finally { setBusy(false); }
   };
 
-  // Список доступных целевых локов для extend — только «длиннее текущего»
+  // list only longer targets than current lockId
   const longerTargets = locks
     .map((lk, idx) => ({ idx, durationDays: Number(lk.duration) / 86400 }))
     .filter(t => t.idx > p.lockId);
@@ -531,7 +528,7 @@ function PositionCard({
       </div>
 
       {msg && <div className="mt-2 text-xs text-white/70">{msg}</div>}
-      {!canWithdraw && <div className="mt-2 text-xs text-white/50">Withdraw/Exit доступны после времени Unlock.</div>}
+      {!canWithdraw && <div className="mt-2 text-xs text-white/50">Withdraw/Exit available after unlock time.</div>}
       {disabledGlobal && <div className="mt-2 text-xs text-red-400">Wrong network: switch to BNB Chain (56).</div>}
     </div>
   );
