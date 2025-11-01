@@ -51,6 +51,14 @@ export default function NavBar() {
           >
             Start Farming
           </Link>
+
+          {/* DAO */}
+          <Link
+            href="/dao/dashboard"
+            className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:bg-[#e6bf59] transition"
+          >
+            DAO
+          </Link>
         </div>
       </nav>
     </header>
