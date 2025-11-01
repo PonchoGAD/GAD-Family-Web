@@ -8,9 +8,14 @@ export const nft721Abi = [
   "function setApprovalForAll(address operator, bool approved)",
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
 
-  // ERC2981 royalties (optional)
+  // ERC2981
   "function royaltyInfo(uint256 tokenId, uint256 salePrice) view returns (address receiver, uint256 royaltyAmount)",
 
-  // custom (optional)
-  "function mintWithFee(address to, string uri) payable returns (uint256 tokenId)"
+  // ТВОИ public/externals (добавили!)
+  "function mintFeeWei() view returns (uint256)",
+  "function paused() view returns (bool)",
+  "function vault() view returns (address)",
+
+  // mint с фикс-ценой
+  "function mintWithFee(address to, string uri) payable returns (uint256 tokenId)",
 ] as const;
