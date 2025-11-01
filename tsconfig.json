@@ -31,7 +31,7 @@
     "src/types/**/*.d.ts",
     "lib/**/*.ts",
     "lib/**/*.tsx"
-  ],
+, "app/pages/api/dao/stats.ts.bak"  ],
   "exclude": [
     "node_modules",
     ".next",
