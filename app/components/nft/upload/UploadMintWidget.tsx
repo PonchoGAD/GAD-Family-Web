@@ -22,12 +22,16 @@ type PinJsonResp = {
   error?: string;
 };
 
-type UnknownRecord = Record<string, unknown>;
+type MintWithFeeSig = (to: string, tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
+type Mint1Sig = (tokenUri: string, overrides?: { value?: bigint }) => Promise<ethers.TransactionResponse>;
+type Mint2Sig = (to: string, tokenUri: string, overrides?: { value?: bigint }) => Promise<ethers.TransactionResponse>;
+
+const GATEWAY = (process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/").replace(/\/+$/, "");
 
 export default function UploadMintWidget() {
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>(""); // gateway или dataURL
-  const [imageIpfs, setImageIpfs] = useState<string>(""); // ipfs://...
+  const [preview, setPreview] = useState<string>("");
+  const [imageIpfs, setImageIpfs] = useState<string>("");
   const [name, setName] = useState("My NFT");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,8 +41,7 @@ export default function UploadMintWidget() {
     if (!f) return;
     setFile(f);
     setImageIpfs("");
-    const url = URL.createObjectURL(f);
-    setPreview(url);
+    setPreview(URL.createObjectURL(f));
   };
 
   async function pinFile(): Promise<{ imageUri: string; gateway: string }> {
@@ -48,9 +51,11 @@ export default function UploadMintWidget() {
     fd.append("name", name || "GAD NFT Image");
 
     const r = await fetch("/api/nft/pin-file", { method: "POST", body: fd });
-    const j = (await r.json()) as PinFileResp;
+    const j: PinFileResp = await r.json();
     if (!j.ok || !j.uri) throw new Error(j.error || "pin-file failed");
-    return { imageUri: j.uri, gateway: j.gateway || "" };
+
+    const gw = j.gateway || (j.cid ? `${GATEWAY}/${j.cid}` : "");
+    return { imageUri: j.uri, gateway: gw };
   }
 
   async function pinJson(imageUri: string): Promise<string> {
@@ -65,38 +70,58 @@ export default function UploadMintWidget() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(meta),
     });
-    const j = (await r.json()) as PinJsonResp;
+    const j: PinJsonResp = await r.json();
     if (!j.ok || !j.uri) throw new Error(j.error || "pin-json failed");
     return j.uri; // ipfs://...
   }
 
   async function detectMintFee(c721: Contract): Promise<bigint> {
     const candidates = ["mintFeeWei", "mintFee", "MINT_FEE", "fee"] as const;
-
     for (const fn of candidates) {
-      try {
-        const rec = c721 as unknown as UnknownRecord;
-        const maybe = rec[fn];
-
-        if (typeof maybe === "function") {
-          const call = maybe as () => Promise<unknown>;
-          const v = await call();
+      const maybe = (c721 as unknown as Record<string, unknown>)[fn];
+      if (typeof maybe === "function") {
+        try {
+          const v = await (maybe as () => Promise<unknown>)();
           if (typeof v === "bigint") return v;
-          if (v && typeof (v as { toString?: () => string }).toString === "function") {
-            const s = (v as { toString: () => string }).toString();
-            return BigInt(s);
-          }
-        }
-      } catch {
-        // try next
+          const s = (v as { toString?: () => string } | null)?.toString?.();
+          if (typeof s === "string") return BigInt(s);
+        } catch { /* next */ }
       }
     }
-    // дефолт-ожидание, если контракт не дал явного значения
-    return ethers.parseEther("0.001");
+    return ethers.parseEther("0.001"); // fallback
   }
 
-  type MintWithFee1 = (tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
-  type MintWithFee2 = (to: string, tokenUri: string, overrides: { value: bigint }) => Promise<ethers.TransactionResponse>;
+  // пред-симуляция через estimateGas — без ts-комментариев и any
+  async function simulateAndPick(
+    c721: Contract,
+    to: string,
+    tokenUri: string,
+    fee: bigint
+  ): Promise<"mintWithFee" | "mint1" | "mint2"> {
+    // 1) ваш основной путь: mintWithFee(address,string)
+    if ("mintWithFee" in c721) {
+      try {
+        await (c721 as unknown as { estimateGas: { mintWithFee: MintWithFeeSig } })
+          .estimateGas.mintWithFee(to, tokenUri, { value: fee });
+        return "mintWithFee";
+      } catch { /* try other fallbacks */ }
+    }
+    // 2) fallback: mint(tokenUri)
+    if ("mint" in c721) {
+      try {
+        await (c721 as unknown as { estimateGas: { mint: Mint1Sig } })
+          .estimateGas.mint(tokenUri, { value: fee });
+        return "mint1";
+      } catch { /* next */ }
+      // 3) fallback: mint(to, tokenUri)
+      try {
+        await (c721 as unknown as { estimateGas: { mint: Mint2Sig } })
+          .estimateGas.mint(to, tokenUri, { value: fee });
+        return "mint2";
+      } catch { /* next */ }
+    }
+    throw new Error("Contract reverted during gas estimation for all known variants. Check fee, pause/allowlist, or ABI.");
+  }
 
   const mint = async () => {
     if (!file) return alert("Choose image first");
@@ -107,45 +132,42 @@ export default function UploadMintWidget() {
       setImageIpfs(imageUri);
       if (gateway) setPreview(gateway);
 
-      setStatus("Creating metadata (pin-json) …");
+      setStatus("Creating metadata…");
       const tokenUri = await pinJson(imageUri);
 
       setStatus("Preparing wallet…");
       const signer = await getSigner();
+      const to = await signer.getAddress();
       const c721 = new Contract(ADDR.NFT721, nft721Abi, signer);
+
       const fee = await detectMintFee(c721);
 
+      setStatus("Estimating gas…");
+      const variant = await simulateAndPick(c721, to, tokenUri, fee);
+
       setStatus(`Sending mint tx (fee ${ethers.formatEther(fee)} BNB)…`);
-      const rec = c721 as unknown as UnknownRecord;
-      const mwfUnknown = rec["mintWithFee"];
-
-      if (typeof mwfUnknown !== "function") {
-        throw new Error("mintWithFee method not found");
-      }
-
       let tx: ethers.TransactionResponse;
-      try {
-        // mintWithFee(tokenUri, { value })
-        const mwf1 = mwfUnknown as MintWithFee1;
-        tx = await mwf1(tokenUri, { value: fee });
-      } catch {
-        // mintWithFee(to, tokenUri, { value })
-        const to = await signer.getAddress();
-        const mwf2 = mwfUnknown as MintWithFee2;
-        tx = await mwf2(to, tokenUri, { value: fee });
+      if (variant === "mintWithFee") {
+        tx = await (c721 as unknown as { mintWithFee: MintWithFeeSig })
+          .mintWithFee(to, tokenUri, { value: fee });
+      } else if (variant === "mint1") {
+        tx = await (c721 as unknown as { mint: Mint1Sig })
+          .mint(tokenUri, { value: fee });
+      } else {
+        tx = await (c721 as unknown as { mint: Mint2Sig })
+          .mint(to, tokenUri, { value: fee });
       }
 
       await tx.wait();
       setStatus("Minted ✅ (fee & gas paid by user)");
       alert("Minted ✅");
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null && "message" in e
-          ? String((e as { message?: unknown }).message)
-          : "Mint failed";
-      setStatus(msg);
+      const msg = e instanceof Error ? e.message : "Mint failed";
+      if (/fee required/i.test(msg)) {
+        setStatus("Mint failed: fee required (msg.value too low).");
+      } else {
+        setStatus(msg);
+      }
       alert(msg);
     } finally {
       setBusy(false);
@@ -172,9 +194,7 @@ export default function UploadMintWidget() {
             </div>
           )}
           {imageIpfs && (
-            <div className="text-xs opacity-70 break-all">
-              IPFS: {imageIpfs}
-            </div>
+            <div className="text-xs opacity-70 break-all">IPFS: {imageIpfs}</div>
           )}
         </div>
 
@@ -193,9 +213,7 @@ export default function UploadMintWidget() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <div className="text-xs opacity-70">
-            Token: {ADDR.NFT721}
-          </div>
+          <div className="text-xs opacity-70">Token: {ADDR.NFT721}</div>
         </div>
       </div>
 
