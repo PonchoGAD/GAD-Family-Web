@@ -11,7 +11,7 @@ import { nft721Abi } from "../../../lib/nft/abis/nft721";
 type PinFileResp = { ok: boolean; cid?: string; uri?: string; gateway?: string; error?: string };
 type PinJsonResp = { ok: boolean; cid?: string; uri?: string; error?: string };
 
-// Сужаем типы методов, чтобы не использовать `any`
+// Узкие интерфейсы, чтобы не использовать any
 type Nft721Read = {
   mintFeeWei: () => Promise<bigint>;
   paused: () => Promise<boolean>;
@@ -22,7 +22,7 @@ type Nft721Write = {
   mintWithFee: (
     to: string,
     uri: string,
-    overrides: { value: bigint }
+    overrides: { value: bigint; gasLimit?: bigint }
   ) => Promise<ethers.TransactionResponse>;
 };
 
@@ -36,7 +36,7 @@ export default function UploadMintWidget() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string>("");
 
-  // Инфо из контракта (для диагностики)
+  // Диагностика из контракта
   const [mintFee, setMintFee] = useState<string>("");
   const [paused, setPaused] = useState<boolean | null>(null);
   const [vaultAddr, setVaultAddr] = useState<string>("");
@@ -47,17 +47,22 @@ export default function UploadMintWidget() {
     []
   );
 
-  // Префлайт: fee/paused/vault
+  // Префлайт: fee / paused / vault
   useEffect(() => {
     (async () => {
       try {
         const eth = (window as unknown as { ethereum?: ethers.Eip1193Provider }).ethereum;
-        const provider = eth ? new BrowserProvider(eth) : new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+        const provider = eth
+          ? new BrowserProvider(eth)
+          : new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL);
+
         const nftBase = new Contract(ADDR.NFT721, nft721Abi, provider);
         const nft = nftBase as unknown as Nft721Read;
 
         let fee = 0n;
-        try { fee = await nft.mintFeeWei(); } catch {}
+        try {
+          fee = await nft.mintFeeWei();
+        } catch {}
         setMintFee(fee ? ethers.formatEther(fee) : "0");
 
         try {
@@ -115,7 +120,7 @@ export default function UploadMintWidget() {
     });
     const j = (await r.json()) as PinJsonResp;
     if (!j.ok || !j.uri) throw new Error(j.error || "pin-json failed");
-    return j.uri;
+    return j.uri; // ipfs://...
   }
 
   const mint = async () => {
@@ -140,22 +145,35 @@ export default function UploadMintWidget() {
       try {
         const p = await cRead.paused();
         if (p) throw new Error("Contract is paused");
-      } catch { /* если нет paused() — ок */ }
+      } catch {
+        /* если нет paused() — ок */
+      }
 
       try {
         const v = await cRead.vault();
         if (v === ethers.ZeroAddress) throw new Error("NFT vault is zero; admin must setVault()");
         const code = await signer.provider!.getCode(v);
         if (!code || code === "0x") throw new Error("NFT vault is not a contract; set correct Vault address");
-      } catch { /* если нет vault() — ок, но у тебя он есть */ }
+      } catch {
+        /* если нет vault() — ок, но у нас есть */
+      }
 
       const fee = await (async () => {
-        try { return await cRead.mintFeeWei(); } catch { return ethers.parseEther("0.001"); }
+        try {
+          return await cRead.mintFeeWei();
+        } catch {
+          return ethers.parseEther("0.001");
+        }
       })();
 
-      setStatus(`Sending mint tx (fee ${ ethers.formatEther(fee) } BNB)…`);
+      setStatus(`Sending mint tx (fee ${ethers.formatEther(fee)} BNB)…`);
+
       const to = await signer.getAddress();
-      const tx = await cWrite.mintWithFee(to, tokenUri, { value: fee });
+
+      // Явный gasLimit: устраняет падения estimateGas на публичных RPC при внутреннем payable-вызове
+      const overrides = { value: fee, gasLimit: 300000n };
+
+      const tx = await cWrite.mintWithFee(to, tokenUri, overrides);
       await tx.wait();
 
       setStatus("Minted ✅ (fee & gas paid by user)");
