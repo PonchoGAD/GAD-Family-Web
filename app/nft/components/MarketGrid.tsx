@@ -13,14 +13,14 @@ type ApiListing = {
   tokenId: string;
   seller: string;
   currency: "BNB" | "USDT";
-  priceWei: string; // из API приходит строкой
+  priceWei: string; // строка из API
 };
 
 type NftItem = {
   tokenId: string;
   image: string;
   name: string;
-  priceLabel?: string;     // "0.15 BNB" | "10.0 USDT"
+  priceLabel?: string;          // "0.15 BNB" | "10.0 USDT"
   currency?: "BNB" | "USDT";
 };
 
@@ -36,7 +36,7 @@ export default function MarketGrid() {
   React.useEffect(() => {
     const load = async () => {
       try {
-        // 1) Пробуем реальные листинги
+        // 1) Реальные листинги
         const r = await fetch("/api/nft/list", { cache: "no-store" });
         if (r.ok) {
           const j = (await r.json()) as { ok: boolean; listings?: ApiListing[] };
@@ -46,7 +46,6 @@ export default function MarketGrid() {
             const filled: NftItem[] = [];
             for (const ls of j.listings) {
               try {
-                // тянем tokenURI каждого выставленного токена
                 const uri = await c.tokenURI(ls.tokenId).catch(() => "");
                 if (!uri) continue;
 
@@ -67,7 +66,7 @@ export default function MarketGrid() {
                   currency: ls.currency,
                 });
               } catch {
-                // пропускаем битые записи
+                /* пропускаем битые записи */
               }
             }
 
@@ -78,7 +77,7 @@ export default function MarketGrid() {
           }
         }
 
-        // 2) Фолбэк — как было: первые 12 tokenId
+        // 2) Фолбэк — первые 12 tokenId
         const c = await getNftContractRead();
         const demo: NftItem[] = [];
         for (let i = 0; i < 12; i++) {

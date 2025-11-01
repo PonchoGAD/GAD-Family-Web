@@ -1,45 +1,56 @@
-import { NextResponse } from "next/server";
-import { getReadProvider } from "../../../lib/nft/eth";
+// app/api/nft/list/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { ethers } from "ethers";
 import { ADDR } from "../../../lib/nft/config";
 import { marketplaceAbi } from "../../../lib/nft/abis/marketplace";
-import { ethers } from "ethers";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(req: NextRequest) {
   try {
-    const provider = await getReadProvider();
+    const url = new URL(req.url);
+    const limit = Math.max(1, Math.min(50, Number(url.searchParams.get("limit") || 20)));
+    const cursor = Number(url.searchParams.get("cursor") || 0); // от какого блока идём назад
 
-    // Первый топик события "Listed"
-    const topicListed = ethers.id(
-      "Listed(address,uint256,address,address,uint256)"
-    );
+    const rpc = process.env.BSC_RPC_URL || process.env.NEXT_PUBLIC_RPC_URL!;
+    const provider = new ethers.JsonRpcProvider(rpc, 56);
+
+    const iface = new ethers.Interface(marketplaceAbi);
+    // Чтобы не ловить несовместимости версий ethers — вычисляем topic напрямую по сигнатуре
+    const topicListed = ethers.id("Listed(address,uint256,address,address,uint256)");
+
+    const latest = await provider.getBlockNumber();
+    const toBlock = cursor && cursor > 0 ? cursor : latest;
+    const fromBlock = Math.max(toBlock - 250_000, 1);
 
     const logs = await provider.getLogs({
       address: ADDR.MARKETPLACE,
-      fromBlock: Math.max((await provider.getBlockNumber()) - 200_000, 1),
-      toBlock: "latest",
+      fromBlock,
+      toBlock,
       topics: [topicListed],
     });
 
-    const iface = new ethers.Interface(marketplaceAbi);
+    // последние limit (с конца) → reverse для «свежие сверху»
+    const slice = logs.slice(-limit).reverse();
 
-    const listings = logs.map((log) => {
+    const listings = slice.map((log) => {
       const parsed = iface.parseLog(log);
       return {
-        nft: parsed.args.nft as string,
+        nft: String(parsed.args.nft),
         tokenId: parsed.args.tokenId.toString(),
-        seller: parsed.args.seller as string,
-        currency:
-          (parsed.args.currency as string).toLowerCase() === ethers.ZeroAddress.toLowerCase()
-            ? "BNB"
-            : "USDT",
+        seller: String(parsed.args.seller),
+        currency: String(parsed.args.currency).toLowerCase() === ethers.ZeroAddress.toLowerCase() ? "BNB" : "USDT",
         priceWei: parsed.args.price.toString(),
+        blockNumber: log.blockNumber,
+        txHash: log.transactionHash,
       };
     });
 
-    return NextResponse.json({ ok: true, listings });
-  } catch (e) {
+    const nextCursor = fromBlock > 1 ? fromBlock - 1 : 0;
+
+    return NextResponse.json({ ok: true, listings, nextCursor });
+  } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("NFT list error:", msg);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }

@@ -1,12 +1,11 @@
+// app/nft/api/mint/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { ethers, Contract, Interface, type LogDescription } from "ethers";
-import { nft721Abi } from "../../../lib/nft/abis/nft721";
-import { ADDR } from "../../../lib/nft/config";
 
-/** Ответ Pinata для pinFile/pinJSON */
+export const dynamic = "force-dynamic";
+
+/** Ответ Pinata */
 type PinataPinResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
 
-/** Метаданные NFT */
 type NftMetadata = {
   name?: string;
   description?: string;
@@ -14,12 +13,38 @@ type NftMetadata = {
   attributes?: Array<Record<string, unknown>>;
 };
 
-// --- Pinata helpers ---
+// ─── helpers ────────────────────────────────────────────────────────────────
+function sanitizeMetadata(meta: NftMetadata): NftMetadata {
+  const safe: NftMetadata = {
+    name: meta.name ? String(meta.name) : undefined,
+    description: meta.description ? String(meta.description) : undefined,
+    image: String(meta.image),
+    attributes: Array.isArray(meta.attributes)
+      ? meta.attributes.map((a) => {
+          const out: Record<string, unknown> = {};
+          Object.entries(a ?? {}).forEach(([k, v]) => {
+            if (v === undefined || typeof v === "function") return;
+            if (typeof v === "bigint") out[k] = v.toString();
+            else out[k] = v;
+          });
+          return out;
+        })
+      : [],
+  };
+  return safe;
+}
+
+async function readAsJsonOrText(r: Response) {
+  const raw = await r.text();
+  try { return JSON.parse(raw); } catch { return { __text: raw }; }
+}
+
+// ─── Pinata: upload image by URL ────────────────────────────────────────────
 async function pinataUploadImageFromUrl(url: string): Promise<string> {
-  const jwt = process.env.PINATA_JWT!;
+  const jwt = process.env.PINATA_JWT;
   if (!jwt) throw new Error("PINATA_JWT is missing");
 
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`fetch image failed: ${res.status}`);
   const blob = await res.blob();
 
@@ -32,17 +57,20 @@ async function pinataUploadImageFromUrl(url: string): Promise<string> {
     method: "POST",
     headers: { Authorization: `Bearer ${jwt}` },
     body: form,
-    cache: "no-store",
   });
 
-  const data = (await up.json()) as PinataPinResp;
-  if (!up.ok) throw new Error(`pinFileToIPFS: ${JSON.stringify(data)}`);
+  const data = (await readAsJsonOrText(up)) as PinataPinResp & { error?: unknown; __text?: string };
+  if (!up.ok) throw new Error(`pinFileToIPFS failed: ${JSON.stringify(data)}`);
+  if (!data?.IpfsHash) throw new Error(`pinFileToIPFS no IpfsHash: ${JSON.stringify(data)}`);
   return `ipfs://${data.IpfsHash}`;
 }
 
+// ─── Pinata: upload metadata JSON ───────────────────────────────────────────
 async function pinataUploadJSON(json: NftMetadata, name = "GAD NFT Metadata"): Promise<string> {
-  const jwt = process.env.PINATA_JWT!;
+  const jwt = process.env.PINATA_JWT;
   if (!jwt) throw new Error("PINATA_JWT is missing");
+
+  const safe = sanitizeMetadata(json);
 
   const up = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
     method: "POST",
@@ -52,91 +80,52 @@ async function pinataUploadJSON(json: NftMetadata, name = "GAD NFT Metadata"): P
     },
     body: JSON.stringify({
       pinataMetadata: { name },
-      pinataContent: json,
+      pinataContent: safe,
       pinataOptions: { cidVersion: 1 },
     }),
-    cache: "no-store",
   });
 
-  const data = (await up.json()) as PinataPinResp;
-  if (!up.ok) throw new Error(`pinJSONToIPFS: ${JSON.stringify(data)}`);
+  const data = (await readAsJsonOrText(up)) as PinataPinResp & { error?: unknown; __text?: string };
+  if (!up.ok) throw new Error(`pinJSONToIPFS failed: ${JSON.stringify(data)}`);
+  if (!data?.IpfsHash) throw new Error(`pinJSONToIPFS no IpfsHash: ${JSON.stringify(data)}`);
   return `ipfs://${data.IpfsHash}`;
 }
 
-// --- get server wallet ---
-function getServerWallet() {
-  const rpc = process.env.BSC_RPC_URL || process.env.NEXT_PUBLIC_RPC_URL!;
-  const pk = process.env.MINTER_PRIVATE_KEY!;
-  if (!pk) throw new Error("MINTER_PRIVATE_KEY is missing");
-  const provider = new ethers.JsonRpcProvider(rpc, 56);
-  return new ethers.Wallet(pk, provider);
-}
-
+// ─── API: POST ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as {
-      to?: string;
+      // ВНИМАНИЕ: теперь сервер НЕ минтит и поле `to` не требуется.
       name?: string;
       description?: string;
       imageUrl?: string;
       attributes?: Array<Record<string, unknown>>;
     };
 
-    const { to, name, description, imageUrl, attributes } = body;
+    const { name, description, imageUrl, attributes } = body;
 
-    if (!to || typeof to !== "string") {
-      return NextResponse.json({ error: "to is required" }, { status: 400 });
-    }
     if (!imageUrl || typeof imageUrl !== "string") {
       return NextResponse.json({ error: "imageUrl is required" }, { status: 400 });
     }
 
-    // 1) upload image to IPFS
+    // 1) image → IPFS
     const imageCidUri = await pinataUploadImageFromUrl(imageUrl);
 
     // 2) metadata → IPFS
-    const metadata: NftMetadata = {
-      name: name || "GAD NFT",
-      description: description || "Minted via GAD Family AI Studio",
-      image: imageCidUri,
-      attributes: Array.isArray(attributes) ? attributes : [],
-    };
-    const tokenUri = await pinataUploadJSON(metadata, name || "GAD NFT Metadata");
+    const tokenUri = await pinataUploadJSON(
+      {
+        name: name || "GAD NFT",
+        description: description || "Minted via GAD Family AI Studio",
+        image: imageCidUri,
+        attributes: Array.isArray(attributes) ? attributes : [],
+      },
+      name || "GAD NFT Metadata"
+    );
 
-    // 3) mintWithFee
-    const wallet = getServerWallet();
-    const nft = new Contract(ADDR.NFT721, nft721Abi, wallet);
-
-    const mintFeeWei: bigint = await nft.mintFeeWei();
-    const tx = await nft.mintWithFee(to, tokenUri, { value: mintFeeWei });
-    const receipt = await tx.wait();
-
-    // try parse tokenId from Transfer
-    let tokenId: string | null = null;
-    const iface = new Interface(nft721Abi);
-    for (const log of receipt.logs) {
-      try {
-        const parsed: LogDescription = iface.parseLog(log);
-        if (parsed?.name === "Transfer") {
-          const v = parsed.args?.tokenId;
-          tokenId = typeof v === "bigint" ? v.toString() : String(v ?? "");
-          if (tokenId) break;
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    return NextResponse.json({
-      ok: true,
-      txHash: receipt.hash,
-      tokenId,
-      tokenUri,
-      imageCidUri,
-    });
+    // Возвращаем только данные для клиентского минта
+    return NextResponse.json({ ok: true, tokenUri, imageCidUri });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error("[MINT/POST] error:", msg);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
