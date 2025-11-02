@@ -1,3 +1,4 @@
+// app/components/nft/upload/UploadMintWidget.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -100,7 +101,7 @@ export default function UploadMintWidget() {
     fd.append("file", file);
     fd.append("name", name || "GAD NFT Image");
 
-    const r = await fetch("/api/nft/pin-file", { method: "POST", body: fd });
+    const r = await fetch("/api/nft/pin-file", { method: "POST", body: fd, cache: "no-store" });
     const j = (await r.json()) as PinFileResp;
     if (!j.ok || !j.uri) throw new Error(j.error || "pin-file failed");
     return { imageUri: j.uri, gateway: j.gateway || "" };
@@ -117,9 +118,10 @@ export default function UploadMintWidget() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(meta),
+      cache: "no-store",
     });
     const j = (await r.json()) as PinJsonResp;
-    if (!j.ok || !j.uri) throw new Error(j.error || "pin-json failed");
+    if (!r.ok || !j.ok || !j.uri) throw new Error(j.error || "pin-json failed");
     return j.uri; // ipfs://...
   }
 
@@ -236,6 +238,7 @@ export default function UploadMintWidget() {
 
       <div className="flex gap-2">
         <button
+          type="button"  // 🔒 не допускаем submit формы → никакого GET
           className="border px-4 py-2 rounded hover:bg-black hover:text-white disabled:opacity-50"
           onClick={mint}
           disabled={busy || !file || !name.trim()}

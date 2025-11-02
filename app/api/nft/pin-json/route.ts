@@ -1,32 +1,26 @@
-// app/api/nft/pin-json/route.ts
 import { NextRequest, NextResponse } from "next/server";
-
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type PinataResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
 
-async function readJson(req: NextRequest) {
-  const text = await req.text();
-  try { return JSON.parse(text) as Record<string, unknown>; }
-  catch { return {}; }
-}
-
-// ✅ OPTIONS для preflight
 export async function OPTIONS() {
   return NextResponse.json({ ok: true }, { status: 200 });
 }
 
-// ✅ POST — основной
 export async function POST(req: NextRequest) {
   try {
     const jwt = process.env.PINATA_JWT;
     if (!jwt) return NextResponse.json({ ok: false, error: "PINATA_JWT missing" }, { status: 500 });
 
-    const meta = await readJson(req);
-    if (!meta || typeof meta !== "object" || Object.keys(meta).length === 0)
-      return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+    const text = await req.text();
+    let meta: Record<string, unknown> = {};
+    try { meta = JSON.parse(text) as Record<string, unknown>; } catch {}
 
-    // Простейшая очистка
+    if (!meta || Object.keys(meta).length === 0) {
+      return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+    }
+
     const safe: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(meta)) {
       if (v === undefined || typeof v === "function") continue;
@@ -35,10 +29,7 @@ export async function POST(req: NextRequest) {
 
     const up = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         pinataMetadata: { name: (safe.name as string) || "GAD NFT Metadata" },
         pinataContent: safe,
@@ -49,10 +40,11 @@ export async function POST(req: NextRequest) {
 
     const raw = await up.text();
     let j: PinataResp | { error?: unknown; __text?: string };
-    try { j = JSON.parse(raw); } catch { j = { __text: raw }; }
+    try { j = JSON.parse(raw) as PinataResp; } catch { j = { __text: raw }; }
 
-    if (!up.ok || !("IpfsHash" in j) || !j.IpfsHash)
+    if (!up.ok || !("IpfsHash" in j) || !j.IpfsHash) {
       return NextResponse.json({ ok: false, error: `pinJSONToIPFS failed: ${JSON.stringify(j)}` }, { status: 500 });
+    }
 
     const cid = j.IpfsHash;
     const gatewayBase = process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/";
@@ -68,7 +60,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ❌ GET — запрещён (чтобы не открывали в браузере)
 export async function GET() {
   return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
 }
