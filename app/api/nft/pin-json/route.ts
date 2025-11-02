@@ -5,8 +5,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const preferredRegion = "auto";
 
-// Префлайт
-export async function OPTIONS() {
+type PinataPinResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
+
+function cors204() {
   return new NextResponse(null, {
     status: 204,
     headers: {
@@ -18,26 +19,25 @@ export async function OPTIONS() {
   });
 }
 
-// HEAD (CDN/браузер может дернуть)
-export async function HEAD() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+export async function OPTIONS() { return cors204(); }
+export async function HEAD()    { return cors204(); }
+
+// Универсальный парсер тела
+async function readBody(req: NextRequest): Promise<unknown | null> {
+  const text = await req.text();
+  try { return JSON.parse(text); } catch { return null; }
 }
 
-type PinataPinResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
-
-function sanitize(x: unknown) {
+// Лёгкая санитизация метаданных
+function sanitizeMeta(x: unknown): Record<string, unknown> {
   if (!x || typeof x !== "object") return {};
-  const o: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
+  const src = x as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(src)) {
     if (v === undefined || typeof v === "function") continue;
-    o[k] = typeof v === "bigint" ? v.toString() : v;
+    out[k] = typeof v === "bigint" ? v.toString() : v;
   }
-  return o;
+  return out;
 }
 
 export async function POST(req: NextRequest) {
@@ -47,15 +47,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "PINATA_JWT is missing" }, { status: 500 });
     }
 
-    const text = await req.text();
-    let meta: unknown = null;
-    try { meta = JSON.parse(text); } catch { /* пусто */ }
-
-    if (!meta || typeof meta !== "object") {
+    const metaRaw = await readBody(req);
+    if (!metaRaw || typeof metaRaw !== "object") {
       return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
     }
 
-    const safe = sanitize(meta);
+    const safe = sanitizeMeta(metaRaw);
+    const name = typeof (safe as { name?: unknown }).name === "string" && (safe as { name?: string }).name?.trim()
+      ? (safe as { name: string }).name.trim()
+      : "GAD NFT Metadata";
 
     const up = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
       method: "POST",
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        pinataMetadata: { name: String((safe as { name?: string }).name || "GAD NFT Metadata") },
+        pinataMetadata: { name },
         pinataContent: safe,
         pinataOptions: { cidVersion: 1 },
       }),
@@ -72,24 +72,24 @@ export async function POST(req: NextRequest) {
     });
 
     const raw = await up.text();
-    let j: PinataPinResp | { __text: string } | Record<string, unknown>;
-    try { j = JSON.parse(raw) as PinataPinResp; } catch { j = { __text: raw }; }
+    let parsed: PinataPinResp | { __text: string };
+    try { parsed = JSON.parse(raw) as PinataPinResp; }
+    catch { parsed = { __text: raw }; }
 
-    const cid = (j as PinataPinResp).IpfsHash;
-    if (!up.ok || !cid) {
+    const ok = up.ok && "IpfsHash" in parsed && typeof (parsed as PinataPinResp).IpfsHash === "string";
+    if (!ok) {
       return NextResponse.json(
-        { ok: false, error: `pinJSONToIPFS failed: ${JSON.stringify(j)}` },
+        { ok: false, error: `pinJSONToIPFS failed: ${JSON.stringify(parsed)}` },
         { status: 500 }
       );
     }
 
-    const gatewayBase = (process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/").replace(/\/?$/, "/");
+    const cid = (parsed as PinataPinResp).IpfsHash;
+    const base = (process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/").replace(/\/?$/, "/");
+
     return NextResponse.json(
-      { ok: true, cid, uri: `ipfs://${cid}`, gateway: gatewayBase + cid },
-      {
-        status: 200,
-        headers: { "Access-Control-Allow-Origin": "*" },
-      }
+      { ok: true, cid, uri: `ipfs://${cid}`, gateway: base + cid },
+      { status: 200, headers: { "Access-Control-Allow-Origin": "*" } }
     );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Для любых других методов — 405 + Allow
+// Явный 405 на GET
 export async function GET() {
   return new NextResponse(JSON.stringify({ ok: false, error: "Method Not Allowed" }), {
     status: 405,
