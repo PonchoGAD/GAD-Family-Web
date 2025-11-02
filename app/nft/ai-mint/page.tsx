@@ -316,7 +316,7 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
         try {
           return await cRead.mintFeeWei();
         } catch {
-          return ethers.parseEther("0.01"); // fallback
+          return ethers.parseEther("0.001"); // fallback
         }
       })();
 
