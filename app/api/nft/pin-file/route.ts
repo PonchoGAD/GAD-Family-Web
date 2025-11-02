@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-/** Ответ Pinata */
 type PinataPinResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 MB
@@ -15,19 +14,23 @@ const ALLOWED_MIME = new Set([
   "image/svg+xml",
 ]);
 
+// Префлайт (если браузер шлёт OPTIONS)
+export async function OPTIONS() {
+  return NextResponse.json({ ok: true }, { status: 200 });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const jwt = process.env.PINATA_JWT;
-    if (!jwt) throw new Error("PINATA_JWT is missing");
+    if (!jwt) {
+      return NextResponse.json({ ok: false, error: "PINATA_JWT is missing" }, { status: 500 });
+    }
 
     // читаем multipart/form-data
     const form = await req.formData();
     const file = form.get("file");
     const nameRaw = form.get("name");
-    const pinName =
-      typeof nameRaw === "string" && nameRaw.trim()
-        ? nameRaw.trim()
-        : "GAD NFT Image";
+    const pinName = typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "GAD NFT Image";
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "file is required" }, { status: 400 });
@@ -52,9 +55,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // готовим FormData для Pinata
+    // готовим FormData для Pinata (важно передать filename)
     const pinForm = new FormData();
-    // ВАЖНО: передаём filename, чтобы Pinata корректно обработала поток
     pinForm.append("file", file, file.name || "upload");
     pinForm.append("pinataMetadata", JSON.stringify({ name: pinName }));
     pinForm.append("pinataOptions", JSON.stringify({ cidVersion: 1 }));
@@ -63,30 +65,35 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { Authorization: `Bearer ${jwt}` },
       body: pinForm,
-      // кэш не нужен
       cache: "no-store",
     });
 
     const raw = await up.text();
-    const data = (() => {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return { __text: raw };
-      }
-    })() as PinataPinResp & { error?: unknown; __text?: string };
 
-    if (!up.ok || !data?.IpfsHash) {
-      throw new Error(`pinFileToIPFS failed: ${JSON.stringify(data)}`);
+    // Парсим без any
+    let data: (PinataPinResp & { error?: unknown }) | { __text: string };
+    try {
+      data = JSON.parse(raw) as PinataPinResp & { error?: unknown };
+    } catch {
+      data = { __text: raw };
+    }
+
+    // Проверяем успешность
+    if (!up.ok || !("IpfsHash" in data) || !data.IpfsHash) {
+      return NextResponse.json(
+        { ok: false, error: `pinFileToIPFS failed: ${JSON.stringify(data)}` },
+        { status: 500 }
+      );
     }
 
     const cid = data.IpfsHash;
+    const gatewayBase = process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/";
     return NextResponse.json({
       ok: true,
       cid,
       uri: `ipfs://${cid}`,
-      gateway: `https://ipfs.io/ipfs/${cid}`,
-      size: data.PinSize ?? size,
+      gateway: gatewayBase.replace(/\/?$/, "/") + cid, // нормализуем слэш
+      size: "PinSize" in data && typeof data.PinSize === "number" ? data.PinSize : size,
       type,
       name: pinName,
     });
@@ -94,4 +101,9 @@ export async function POST(req: NextRequest) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
+}
+
+// Явный 405 на GET, чтобы нельзя было просто открыть эндпоинт в браузере
+export async function GET() {
+  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
 }
