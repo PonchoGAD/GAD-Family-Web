@@ -23,7 +23,7 @@ type Nft721Write = {
   mintWithFee: (
     to: string,
     uri: string,
-    overrides: { value: bigint; gasLimit?: bigint }
+    overrides: { value: bigint; gasLimit?: bigint; gasPrice?: bigint }
   ) => Promise<ethers.TransactionResponse>;
 };
 
@@ -292,7 +292,6 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
       if (!eth) throw new Error("No wallet (window.ethereum) found");
       const provider = new BrowserProvider(eth);
       const signer = await provider.getSigner();
-      const to = await signer.getAddress();
 
       const cBase = new Contract(ADDR.NFT721, nft721Abi, signer);
       const cRead = cBase as unknown as Nft721Read;
@@ -321,7 +320,36 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
       })();
 
       setStatus(`Sending mint tx (fee ${ethers.formatEther(fee)} BNB)…`);
-      const overrides = { value: fee, gasLimit: 300000n };
+
+      // -------- ВСТАВЛЕННЫЙ БЛОК: gasPrice + estimateGas --------
+      const feeData = await provider.getFeeData();
+      // BSC норм: 3–5 gwei. Подстрахуемся на 3 gwei, если RPC вернуло null/0.
+      const gasPrice =
+        feeData.gasPrice && feeData.gasPrice > 0n
+          ? feeData.gasPrice
+          : ethers.parseUnits("3", "gwei");
+
+      // (опционально) аккуратно оценим газ, но не больше 300_000:
+      let gasLimit: bigint = 300000n;
+      try {
+        const est = await signer.estimateGas({
+          to: ADDR.NFT721,
+          data: new ethers.Interface(nft721Abi).encodeFunctionData(
+            "mintWithFee",
+            [await signer.getAddress(), tokenUri]
+          ),
+          value: fee,
+        });
+        // подушка +20%, но ограничим верх
+        gasLimit = est + (est / 5n);
+        if (gasLimit > 300000n) gasLimit = 300000n;
+      } catch {
+        /* оставим 300k */
+      }
+      // ----------------------------------------------------------
+
+      const to = await signer.getAddress();
+      const overrides = { value: fee, gasLimit, gasPrice };
       const tx = await cWrite.mintWithFee(to, tokenUri, overrides);
       const receipt = await tx.wait();
 
