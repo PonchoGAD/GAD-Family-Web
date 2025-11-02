@@ -1,59 +1,51 @@
-// lib/nft/ipfs.ts
-const PINATA_JWT = process.env.PINATA_JWT || "";
-const PINATA_GATEWAY = process.env.PINATA_GATEWAY || "https://gateway.pinata.cloud";
+// app/lib/nft/ipfs.ts
+// Универсальный модуль для загрузки JSON и файлов в IPFS через /api/nft/*
 
-export type PinJsonResp = { IpfsHash: string; PinSize: number; Timestamp: string };
+export type PinJsonResp = {
+  ok: boolean;
+  cid?: string;
+  uri?: string;
+  gateway?: string;
+  error?: string;
+};
 
-const isServer = typeof window === "undefined";
+export type PinFileResp = {
+  ok: boolean;
+  cid?: string;
+  uri?: string;
+  gateway?: string;
+  error?: string;
+};
 
-export const pinJSON = async (payload: unknown): Promise<{ cid: string; url: string }> => {
-  if (!isServer) {
-    // клиент → безопасно проксируем через API
-    const res = await fetch("/api/ipfs/pinJSON", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error(`pinJSON api failed: ${res.status}`);
-    const { cid } = (await res.json()) as { cid: string };
-    return { cid, url: `${PINATA_GATEWAY}/ipfs/${cid}` };
-  }
-
-  // сервер → прямой вызов Pinata
-  if (!PINATA_JWT) throw new Error("PINATA_JWT is missing in env");
-  const res = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+/**
+ * 📦 pinJson — загружает JSON-метаданные на IPFS
+ * @param meta объект метаданных (например { name, description, image })
+ */
+export async function pinJson(meta: Record<string, unknown>): Promise<PinJsonResp> {
+  const r = await fetch("/api/nft/pin-json", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${PINATA_JWT}`,
-    },
-    body: JSON.stringify(payload),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(meta),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Pinata JSON failed: ${res.status}`);
-  const data = (await res.json()) as PinJsonResp;
-  return { cid: data.IpfsHash, url: `${PINATA_GATEWAY}/ipfs/${data.IpfsHash}` };
-};
+  const j = (await r.json()) as PinJsonResp;
+  if (!r.ok || !j.ok || !j.cid)
+    throw new Error(j.error || `pin-json failed: ${r.status}`);
+  return j;
+}
 
-export const pinFile = async (file: File | Blob): Promise<{ cid: string; url: string }> => {
-  if (!isServer) {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/ipfs/pinFile", { method: "POST", body: form });
-    if (!res.ok) throw new Error(`pinFile api failed: ${res.status}`);
-    const { cid } = (await res.json()) as { cid: string };
-    return { cid, url: `${PINATA_GATEWAY}/ipfs/${cid}` };
-  }
-
-  if (!PINATA_JWT) throw new Error("PINATA_JWT is missing in env");
-  const form = new FormData();
-  form.append("file", file);
-  const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+/**
+ * 🖼 pinFile — загружает файл (FormData) на IPFS
+ * @param fd FormData с файлом {file, name?}
+ */
+export async function pinFile(fd: FormData): Promise<PinFileResp> {
+  const r = await fetch("/api/nft/pin-file", {
     method: "POST",
-    headers: { Authorization: `Bearer ${PINATA_JWT}` },
-    body: form,
+    body: fd,
+    cache: "no-store",
   });
-  if (!res.ok) throw new Error(`Pinata File failed: ${res.status}`);
-  const data = (await res.json()) as PinJsonResp;
-  return { cid: data.IpfsHash, url: `${PINATA_GATEWAY}/ipfs/${data.IpfsHash}` };
-};
+  const j = (await r.json()) as PinFileResp;
+  if (!r.ok || !j.ok || !j.cid)
+    throw new Error(j.error || `pin-file failed: ${r.status}`);
+  return j;
+}
