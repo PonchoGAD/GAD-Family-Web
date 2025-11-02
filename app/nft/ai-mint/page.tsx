@@ -2,13 +2,30 @@
 
 import React from "react";
 import AiMintClient from "./AiMintClient";
-import MintDialog from "../../components/nft/studio/MintDialog";
+import { ethers, Contract, BrowserProvider } from "ethers";
+import { ADDR } from "../../lib/nft/config";
+import { nft721Abi } from "../../lib/nft/abis/nft721";
 
-// ⚙️ Если у тебя будет API-роут, достаточно прописать NEXT_PUBLIC_AI_ENDPOINT в .env
-const AI_ENDPOINT =
-  process.env.NEXT_PUBLIC_AI_ENDPOINT?.trim() || "/api/ai/generate";
+// ⚙️ Если подключите реальный AI endpoint — пропишите NEXT_PUBLIC_AI_ENDPOINT в .env
+const AI_ENDPOINT = (process.env.NEXT_PUBLIC_AI_ENDPOINT || "/nft/api/ai").trim();
 
 type GenSize = "512" | "768" | "1024";
+
+type PinFileResp = { ok: boolean; cid?: string; uri?: string; gateway?: string; error?: string };
+type PinJsonResp = { ok: boolean; cid?: string; uri?: string; gateway?: string; error?: string };
+
+type Nft721Read = {
+  mintFeeWei: () => Promise<bigint>;
+  paused: () => Promise<boolean>;
+  vault: () => Promise<string>;
+};
+type Nft721Write = {
+  mintWithFee: (
+    to: string,
+    uri: string,
+    overrides: { value: bigint; gasLimit?: bigint }
+  ) => Promise<ethers.TransactionResponse>;
+};
 
 export default function Page() {
   const [tab, setTab] = React.useState<"generate" | "upload">("generate");
@@ -23,50 +40,44 @@ export default function Page() {
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const [gallery, setGallery] = React.useState<string[]>([]);
 
-  // статус минта (покажет тосты внутри MintDialog)
+  // статус минта
   const [mintedToken, setMintedToken] = React.useState<string | null>(null);
 
   const pushToGallery = (url: string) => {
-    setGallery((prev) => {
-      const next = [url, ...prev];
-      return next.slice(0, 6); // максимум 6 превью
-    });
+    setGallery((prev) => [url, ...prev].slice(0, 6));
   };
 
-  // 🔮 генерация через API, если он есть; иначе fallback—локальный mock через canvas
+  // 🔮 генерация через API; если не вернул — fallback canvas
   const generate = async () => {
     try {
       setGenerating(true);
-
-      // попытка пойти в реальный endpoint
       const res = await fetch(AI_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, size, seed: seed || undefined }),
+        cache: "no-store",
       });
 
-if (res.ok) {
-  // ожидаем любой из вариантов: {image: "data:image/png;base64,..." } или {url:"..."}
-  const json: Record<string, unknown> = await res.json().catch(() => ({}));
-  const img =
-    typeof json.image === "string"
-      ? json.image
-      : typeof json.url === "string"
-      ? json.url
-      : typeof json.dataUrl === "string"
-      ? json.dataUrl
-      : typeof json.data === "string"
-      ? json.data
-      : undefined;
+      if (res.ok) {
+        const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        const img =
+          typeof json.image === "string"
+            ? json.image
+            : typeof json.url === "string"
+            ? json.url
+            : typeof json.dataUrl === "string"
+            ? json.dataUrl
+            : typeof json.data === "string"
+            ? json.data
+            : undefined;
 
-  if (img) {
-    setSelectedImage(img);
-    pushToGallery(img);
-    return;
-  }
-}
+        if (img) {
+          setSelectedImage(img);
+          pushToGallery(img);
+          return;
+        }
+      }
 
-      // fallback: локально нарисуем плейсхолдер, чтобы UX был завершённым
       const dataUrl = await drawPlaceholder(prompt, size);
       setSelectedImage(dataUrl);
       pushToGallery(dataUrl);
@@ -79,7 +90,7 @@ if (res.ok) {
     }
   };
 
-  // 📤 загрузка своей картинки (png/jpg)
+  // 📤 загрузка своей картинки (png/jpg/webp)
   const onUploadFile = async (file: File) => {
     if (!file) return;
     const ok = /image\/(png|jpeg|jpg|webp)/i.test(file.type);
@@ -95,7 +106,6 @@ if (res.ok) {
   const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void onUploadFile(file);
-    // reset input so the same file can be re-picked
     e.currentTarget.value = "";
   };
 
@@ -152,6 +162,7 @@ if (res.ok) {
                   </div>
                   <div className="flex items-end">
                     <button
+                      type="button"
                       onClick={generate}
                       disabled={generating}
                       className="w-full px-4 py-3 rounded-xl bg-[#FFD166] text-[#0B0F17] font-semibold hover:opacity-90 disabled:opacity-60"
@@ -169,6 +180,7 @@ if (res.ok) {
                       {gallery.map((g, i) => (
                         <button
                           key={i}
+                          type="button"
                           className={`relative aspect-square rounded-lg overflow-hidden border ${
                             selectedImage === g ? "border-[#FFD166]" : "border-white/10"
                           }`}
@@ -213,10 +225,7 @@ if (res.ok) {
             </div>
 
             <div className="mt-4">
-              <MintDialog
-                image={selectedImage || ""}
-                onMintedAction={(tokenId) => setMintedToken(tokenId)}
-              />
+              <MintBox image={selectedImage} onMinted={(token) => setMintedToken(token)} />
             </div>
 
             {mintedToken && (
@@ -225,9 +234,7 @@ if (res.ok) {
               </div>
             )}
 
-            <div className="mt-6 text-xs text-white/50">
-              Powered by GAD Family · BNB Chain
-            </div>
+            <div className="mt-6 text-xs text-white/50">Powered by GAD Family · BNB Chain</div>
           </section>
         </div>
       </div>
@@ -235,9 +242,156 @@ if (res.ok) {
   );
 }
 
-// ===== helpers =====
+/* ====================== MintBox ====================== */
 
-// плавный табпереключатель без внешних зависимостей
+function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId: string) => void }) {
+  const [name, setName] = React.useState("My AI NFT");
+  const [description, setDescription] = React.useState("Generated by GAD AI Studio");
+  const [busy, setBusy] = React.useState(false);
+  const [status, setStatus] = React.useState<string>("");
+
+  const canMint = Boolean(image && name.trim());
+
+  const doMint = async () => {
+    if (!image) {
+      alert("Select or generate an image first");
+      return;
+    }
+    try {
+      setBusy(true);
+      setStatus("Uploading image to IPFS…");
+
+      // 1) dataURL -> File
+      const file = await dataUrlToFile(image, "image.png");
+
+      // 2) pin-file
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("name", name || "GAD NFT Image");
+      const r1 = await fetch("/api/nft/pin-file", { method: "POST", body: fd, cache: "no-store" });
+      const j1 = (await r1.json()) as PinFileResp;
+      if (!r1.ok || !j1.ok || !j1.uri) throw new Error(j1.error || "pin-file failed");
+      const imageUri = j1.uri; // ipfs://...
+
+      // 3) pin-json
+      setStatus("Writing metadata (pin-json) …");
+      const meta = { name, description, image: imageUri, attributes: [] as Array<Record<string, unknown>> };
+      const r2 = await fetch("/api/nft/pin-json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(meta),
+        cache: "no-store",
+      });
+      const j2 = (await r2.json()) as PinJsonResp;
+      if (!r2.ok || !j2.ok || !j2.uri) throw new Error(j2.error || "pin-json failed");
+      const tokenUri = j2.uri;
+
+      // 4) mint
+      setStatus("Preparing wallet…");
+      const eth = (window as unknown as { ethereum?: ethers.Eip1193Provider }).ethereum;
+      if (!eth) throw new Error("No wallet (window.ethereum) found");
+      const provider = new BrowserProvider(eth);
+      const signer = await provider.getSigner();
+      const to = await signer.getAddress();
+
+      const cBase = new Contract(ADDR.NFT721, nft721Abi, signer);
+      const cRead = cBase as unknown as Nft721Read;
+      const cWrite = cBase as unknown as Nft721Write;
+
+      // soft-checks
+      try {
+        const p = await cRead.paused();
+        if (p) throw new Error("Contract is paused");
+      } catch {
+        /* if no paused() — ignore */
+      }
+      try {
+        const v = await cRead.vault();
+        if (v === ethers.ZeroAddress) throw new Error("NFT vault is zero; admin must setVault()");
+      } catch {
+        /* ignore if absent */
+      }
+
+      const fee: bigint = await (async () => {
+        try {
+          return await cRead.mintFeeWei();
+        } catch {
+          return ethers.parseEther("0.01"); // fallback
+        }
+      })();
+
+      setStatus(`Sending mint tx (fee ${ethers.formatEther(fee)} BNB)…`);
+      const overrides = { value: fee, gasLimit: 300000n };
+      const tx = await cWrite.mintWithFee(to, tokenUri, overrides);
+      const receipt = await tx.wait();
+
+      // Пытаемся достать tokenId из события Transfer(address(0) -> to, tokenId)
+      let mintedTokenId: string | null = null;
+      try {
+        const iface = new ethers.Interface(nft721Abi);
+        for (const log of receipt.logs) {
+          try {
+            const parsed = iface.parseLog(log);
+            if (parsed?.name === "Transfer") {
+              const from = String(parsed.args[0]);
+              const toAddr = String(parsed.args[1]);
+              const tk = parsed.args[2] as bigint;
+              if (from.toLowerCase() === ethers.ZeroAddress && toAddr.toLowerCase() === to.toLowerCase()) {
+                mintedTokenId = tk.toString();
+                break;
+              }
+            }
+          } catch {
+            // не наш лог — пропускаем
+          }
+        }
+      } catch {
+        // парсинг не критичен
+      }
+
+      setStatus("Minted ✅");
+      onMinted(mintedTokenId ?? "new");
+      alert(`NFT minted!${mintedTokenId ? ` Token #${mintedTokenId}` : ""}`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Mint failed";
+      setStatus(msg);
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border rounded-xl p-4 bg-[#0E0E12]/80 text-white space-y-3">
+      <div className="font-semibold text-lg">Mint Generated NFT</div>
+      <input
+        className="border rounded px-3 py-2 w-full bg-transparent"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Name"
+      />
+      <textarea
+        className="border rounded px-3 py-2 w-full bg-transparent"
+        rows={3}
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description"
+      />
+      <button
+        type="button"
+        onClick={doMint}
+        disabled={!canMint || busy}
+        className="border border-[#FFD166] text-[#FFD166] rounded px-4 py-2 hover:bg-[#FFD166] hover:text-black transition w-full disabled:opacity-60"
+      >
+        {busy ? "Minting…" : "Mint to Wallet"}
+      </button>
+      {status && <div className="text-xs text-white/70">{status}</div>}
+    </div>
+  );
+}
+
+/* ====================== helpers ====================== */
+
 function Tabs({
   tab,
   onTab,
@@ -248,18 +402,16 @@ function Tabs({
   return (
     <div className="inline-flex bg-black/30 border border-white/10 rounded-xl overflow-hidden">
       <button
+        type="button"
         onClick={() => onTab("generate")}
-        className={`px-4 py-2 text-sm ${
-          tab === "generate" ? "bg-white/10 text-white" : "text-white/70 hover:text-white"
-        }`}
+        className={`px-4 py-2 text-sm ${tab === "generate" ? "bg-white/10 text-white" : "text-white/70 hover:text-white"}`}
       >
         Generate
       </button>
       <button
+        type="button"
         onClick={() => onTab("upload")}
-        className={`px-4 py-2 text-sm ${
-          tab === "upload" ? "bg-white/10 text-white" : "text-white/70 hover:text-white"
-        }`}
+        className={`px-4 py-2 text-sm ${tab === "upload" ? "bg-white/10 text-white" : "text-white/70 hover:text-white"}`}
       >
         Upload
       </button>
@@ -277,23 +429,23 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-// простая заглушка-генератор, если API ещё не подключён
 async function drawPlaceholder(text: string, size: GenSize): Promise<string> {
   const s = Number(size);
   const canvas = document.createElement("canvas");
   canvas.width = s;
   canvas.height = s;
   const ctx = canvas.getContext("2d")!;
-  // фон
+  // background
   const g = ctx.createLinearGradient(0, 0, s, s);
   g.addColorStop(0, "#0E0E12");
   g.addColorStop(0.6, "#1C2025");
   g.addColorStop(1, "#23262B");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
-  // «coin» диск
+  // coin-like disk
   const r = s * 0.28;
-  const cx = s * 0.5, cy = s * 0.5;
+  const cx = s * 0.5;
+  const cy = s * 0.5;
   const rg = ctx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
   rg.addColorStop(0, "rgba(212,175,55,0.85)");
   rg.addColorStop(1, "rgba(212,175,55,0.15)");
@@ -301,7 +453,7 @@ async function drawPlaceholder(text: string, size: GenSize): Promise<string> {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  // титр
+  // caption
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.font = `${Math.max(16, s * 0.04)}px ui-sans-serif, system-ui, -apple-system`;
   const lines = wrapText(text, s * 0.7, ctx);
@@ -326,4 +478,17 @@ function wrapText(t: string, max: number, ctx: CanvasRenderingContext2D) {
   }
   if (line) out.push(line);
   return out.slice(0, 3);
+}
+
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) throw new Error("Invalid data URL");
+  const mime = m[1];
+  const b64 = m[2];
+  const bin = atob(b64);
+  const len = bin.length;
+  const u8 = new Uint8Array(len);
+  for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+  const blob = new Blob([u8], { type: mime || "image/png" });
+  return new File([blob], filename, { type: mime || "image/png" });
 }

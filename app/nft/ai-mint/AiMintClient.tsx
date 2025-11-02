@@ -37,7 +37,9 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
           const provider = new ethers.BrowserProvider(eth);
           const signer = await provider.getSigner();
           onConnectedAction?.(addr, signer);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       } else {
         setAccount(null);
         onDisconnectedAction?.();
@@ -49,13 +51,19 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
       setChainId(Number.isNaN(id) ? null : id);
     };
 
-    void eth.request({ method: "eth_accounts" }).then((res) => {
-      handleAccountsChanged(res as string[]);
-    }).catch(() => {});
+    void eth
+      .request({ method: "eth_accounts" })
+      .then((res) => {
+        handleAccountsChanged(res as string[]);
+      })
+      .catch(() => {});
 
-    void eth.request({ method: "eth_chainId" }).then((res) => {
-      handleChainChanged(String(res));
-    }).catch(() => {});
+    void eth
+      .request({ method: "eth_chainId" })
+      .then((res) => {
+        handleChainChanged(String(res));
+      })
+      .catch(() => {});
 
     eth.on?.("accountsChanged", handleAccountsChanged);
     eth.on?.("chainChanged", handleChainChanged);
@@ -76,7 +84,7 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
     try {
       setBusy(true);
       setMsg("");
-      const accounts = await eth.request({ method: "eth_requestAccounts" }) as string[];
+      const accounts = (await eth.request({ method: "eth_requestAccounts" })) as string[];
       if (!accounts?.length) return;
 
       const provider = new ethers.BrowserProvider(eth);
@@ -87,9 +95,11 @@ export default function AiMintClient({ className, onConnectedAction, onDisconnec
       try {
         await eth.request({
           method: "wallet_switchEthereumChain",
-          params: [{ chainId: "0x38" }],
+          params: [{ chainId: "0x38" }], // BSC mainnet
         });
-      } catch { /* user may reject, ignore */ }
+      } catch {
+        // user may reject — ok
+      }
 
       onConnectedAction?.(addr, signer);
     } catch (e: unknown) {
