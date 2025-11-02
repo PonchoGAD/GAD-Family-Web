@@ -1,7 +1,9 @@
 // app/api/nft/pin-file/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const preferredRegion = "auto";
 
 type PinataPinResp = { IpfsHash: string; PinSize?: number; Timestamp?: string };
 
@@ -14,9 +16,24 @@ const ALLOWED_MIME = new Set([
   "image/svg+xml",
 ]);
 
-// Префлайт (если браузер шлёт OPTIONS)
+// --- CORS / preflight
 export async function OPTIONS() {
-  return NextResponse.json({ ok: true }, { status: 200 });
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS, HEAD",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+export async function HEAD() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: { "Access-Control-Allow-Origin": "*" },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -26,19 +43,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "PINATA_JWT is missing" }, { status: 500 });
     }
 
-    // читаем multipart/form-data
     const form = await req.formData();
     const file = form.get("file");
     const nameRaw = form.get("name");
-    const pinName = typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "GAD NFT Image";
+    const pinName =
+      typeof nameRaw === "string" && nameRaw.trim() ? nameRaw.trim() : "GAD NFT Image";
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "file is required" }, { status: 400 });
     }
 
-    // базовые валидации
-    const size = file.size ?? 0;
-    const type = file.type ?? "application/octet-stream";
+    const size: number = file.size ?? 0;
+    const type: string = file.type ?? "application/octet-stream";
     if (size <= 0) {
       return NextResponse.json({ ok: false, error: "empty file" }, { status: 400 });
     }
@@ -55,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // готовим FormData для Pinata (важно передать filename)
+    // Pinata upload
     const pinForm = new FormData();
     pinForm.append("file", file, file.name || "upload");
     pinForm.append("pinataMetadata", JSON.stringify({ name: pinName }));
@@ -69,41 +85,50 @@ export async function POST(req: NextRequest) {
     });
 
     const raw = await up.text();
-
-    // Парсим без any
-    let data: (PinataPinResp & { error?: unknown }) | { __text: string };
+    let parsed: PinataPinResp | { __text: string };
     try {
-      data = JSON.parse(raw) as PinataPinResp & { error?: unknown };
+      parsed = JSON.parse(raw) as PinataPinResp;
     } catch {
-      data = { __text: raw };
+      parsed = { __text: raw };
     }
 
-    // Проверяем успешность
-    if (!up.ok || !("IpfsHash" in data) || !data.IpfsHash) {
+    const ok = up.ok && "IpfsHash" in parsed && typeof (parsed as PinataPinResp).IpfsHash === "string";
+    if (!ok) {
       return NextResponse.json(
-        { ok: false, error: `pinFileToIPFS failed: ${JSON.stringify(data)}` },
+        { ok: false, error: `pinFileToIPFS failed: ${JSON.stringify(parsed)}` },
         { status: 500 }
       );
     }
 
-    const cid = data.IpfsHash;
-    const gatewayBase = process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/";
-    return NextResponse.json({
-      ok: true,
-      cid,
-      uri: `ipfs://${cid}`,
-      gateway: gatewayBase.replace(/\/?$/, "/") + cid, // нормализуем слэш
-      size: "PinSize" in data && typeof data.PinSize === "number" ? data.PinSize : size,
-      type,
-      name: pinName,
-    });
+    const cid = (parsed as PinataPinResp).IpfsHash;
+    const gatewayBase = (process.env.NEXT_PUBLIC_IPFS_GATEWAY || "https://ipfs.io/ipfs/").replace(/\/?$/, "/");
+
+    return NextResponse.json(
+      {
+        ok: true,
+        cid,
+        uri: `ipfs://${cid}`,
+        gateway: gatewayBase + cid,
+        size: "PinSize" in parsed && typeof parsed.PinSize === "number" ? parsed.PinSize : size,
+        type,
+        name: pinName,
+      },
+      { status: 200, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
 }
 
-// Явный 405 на GET, чтобы нельзя было просто открыть эндпоинт в браузере
+// Явный 405 на GET
 export async function GET() {
-  return NextResponse.json({ ok: false, error: "Method Not Allowed" }, { status: 405 });
+  return new NextResponse(JSON.stringify({ ok: false, error: "Method Not Allowed" }), {
+    status: 405,
+    headers: {
+      "content-type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Allow": "POST, OPTIONS, HEAD",
+    },
+  });
 }
