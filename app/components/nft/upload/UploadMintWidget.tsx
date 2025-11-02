@@ -12,7 +12,7 @@ import { nft721Abi } from "../../../lib/nft/abis/nft721";
 type PinFileResp = { ok: boolean; cid?: string; uri?: string; gateway?: string; error?: string };
 type PinJsonResp = { ok: boolean; cid?: string; uri?: string; error?: string };
 
-// Узкие интерфейсы, чтобы не использовать any
+// Узкие интерфейсы без any
 type Nft721Read = {
   mintFeeWei: () => Promise<bigint>;
   paused: () => Promise<boolean>;
@@ -126,7 +126,10 @@ export default function UploadMintWidget() {
   }
 
   const mint = async () => {
-    if (!file) return alert("Choose image first");
+    if (!file) {
+      alert("Choose image first");
+      return;
+    }
     try {
       setBusy(true);
       setStatus("Uploading file to IPFS…");
@@ -157,7 +160,7 @@ export default function UploadMintWidget() {
         const code = await signer.provider!.getCode(v);
         if (!code || code === "0x") throw new Error("NFT vault is not a contract; set correct Vault address");
       } catch {
-        /* если нет vault() — ок, но у нас есть */
+        /* если нет vault() — ок, но у нас он есть */
       }
 
       const fee = await (async () => {
@@ -190,63 +193,66 @@ export default function UploadMintWidget() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="border rounded p-3 space-y-3">
-          <div className="font-semibold">1) Image</div>
-          <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} />
-          {preview && (
-            <div className="rounded border overflow-hidden">
-              <Image
-                src={preview}
-                alt="preview"
-                width={512}
-                height={512}
-                className="w-full h-auto"
-                unoptimized
-                priority
-              />
-            </div>
-          )}
-          {imageIpfs && <div className="text-xs opacity-70 break-all">IPFS: {imageIpfs}</div>}
-        </div>
+    // Если вдруг виджет окажется внутри <form> выше по дереву — этот onSubmit «потушит» submit.
+    <form onSubmit={(e) => e.preventDefault()}>
+      <div className="space-y-6">
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="border rounded p-3 space-y-3">
+            <div className="font-semibold">1) Image</div>
+            <input type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0])} />
+            {preview && (
+              <div className="rounded border overflow-hidden">
+                <Image
+                  src={preview}
+                  alt="preview"
+                  width={512}
+                  height={512}
+                  className="w-full h-auto"
+                  unoptimized
+                  priority
+                />
+              </div>
+            )}
+            {imageIpfs && <div className="text-xs opacity-70 break-all">IPFS: {imageIpfs}</div>}
+          </div>
 
-        <div className="border rounded p-3 space-y-3">
-          <div className="font-semibold">2) Metadata</div>
-          <input
-            className="border p-2 w-full rounded"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <textarea
-            className="border p-2 w-full rounded"
-            placeholder="Description"
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-          <div className="text-xs opacity-70 space-y-1">
-            <div>NFT721: {ADDR.NFT721}</div>
-            <div>Mint fee (contract): {mintFee || "—"} BNB</div>
-            <div>Paused: {paused === null ? "—" : paused ? "yes" : "no"}</div>
-            <div>Vault: {vaultAddr ? `${vaultAddr.slice(0, 10)}…${vaultAddr.slice(-8)}` : "—"}</div>
-            <div>Vault is contract: {vaultIsContract === null ? "—" : vaultIsContract ? "yes" : "no"}</div>
+          <div className="border rounded p-3 space-y-3">
+            <div className="font-semibold">2) Metadata</div>
+            <input
+              className="border p-2 w-full rounded"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <textarea
+              className="border p-2 w-full rounded"
+              placeholder="Description"
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+            <div className="text-xs opacity-70 space-y-1">
+              <div>NFT721: {ADDR.NFT721}</div>
+              <div>Mint fee (contract): {mintFee || "—"} BNB</div>
+              <div>Paused: {paused === null ? "—" : paused ? "yes" : "no"}</div>
+              <div>Vault: {vaultAddr ? `${vaultAddr.slice(0, 10)}…${vaultAddr.slice(-8)}` : "—"}</div>
+              <div>Vault is contract: {vaultIsContract === null ? "—" : vaultIsContract ? "yes" : "no"}</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="flex gap-2">
-        <button
-          type="button"  // 🔒 не допускаем submit формы → никакого GET
-          className="border px-4 py-2 rounded hover:bg-black hover:text-white disabled:opacity-50"
-          onClick={mint}
-          disabled={busy || !file || !name.trim()}
-        >
-          Upload & Mint
-        </button>
-        {status && <div className="text-sm opacity-70 self-center">{status}</div>}
+        <div className="flex gap-2">
+          <button
+            type="button" // 🔒 не допускаем submit формы → никакого GET
+            className="border px-4 py-2 rounded hover:bg-black hover:text-white disabled:opacity-50"
+            onClick={mint}
+            disabled={busy || !file || !name.trim()}
+          >
+            Upload & Mint
+          </button>
+          {status && <div className="text-sm opacity-70 self-center">{status}</div>}
+        </div>
       </div>
-    </div>
+    </form>
   );
 }
