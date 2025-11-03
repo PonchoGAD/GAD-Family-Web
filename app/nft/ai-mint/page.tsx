@@ -19,13 +19,6 @@ type Nft721Read = {
   paused: () => Promise<boolean>;
   vault: () => Promise<string>;
 };
-type Nft721Write = {
-  mintWithFee: (
-    to: string,
-    uri: string,
-    overrides: { value: bigint; gasLimit?: bigint; gasPrice?: bigint }
-  ) => Promise<ethers.TransactionResponse>;
-};
 
 export default function Page() {
   const [tab, setTab] = React.useState<"generate" | "upload">("generate");
@@ -295,7 +288,6 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
 
       const cBase = new Contract(ADDR.NFT721, nft721Abi, signer);
       const cRead = cBase as unknown as Nft721Read;
-      const cWrite = cBase as unknown as Nft721Write;
 
       // soft-checks
       try {
@@ -321,15 +313,13 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
 
       setStatus(`Sending mint tx (fee ${ethers.formatEther(fee)} BNB)…`);
 
-      // -------- ВСТАВЛЕННЫЙ БЛОК: gasPrice + estimateGas --------
+      // -------- газ и явное формирование calldata --------
       const feeData = await provider.getFeeData();
-      // BSC норм: 3–5 gwei. Подстрахуемся на 3 gwei, если RPC вернуло null/0.
       const gasPrice =
         feeData.gasPrice && feeData.gasPrice > 0n
           ? feeData.gasPrice
           : ethers.parseUnits("3", "gwei");
 
-      // (опционально) аккуратно оценим газ, но не больше 300_000:
       let gasLimit: bigint = 300000n;
       try {
         const est = await signer.estimateGas({
@@ -340,37 +330,43 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
           ),
           value: fee,
         });
-        // подушка +20%, но ограничим верх
         gasLimit = est + (est / 5n);
         if (gasLimit > 300000n) gasLimit = 300000n;
       } catch {
         /* оставим 300k */
       }
-      // ----------------------------------------------------------
 
       const to = await signer.getAddress();
-      const overrides = { value: fee, gasLimit, gasPrice };
-      const tx = await cWrite.mintWithFee(to, tokenUri, overrides);
+
+      // 👇 формируем data через populateTransaction и отправляем вручную
+      const fn = new Contract(ADDR.NFT721, nft721Abi, signer).getFunction("mintWithFee");
+      const txReq = await fn.populateTransaction(to, tokenUri, { value: fee, gasLimit, gasPrice });
+
+      // симуляция, чтобы отловить revert до майнинга
+      await provider.call(txReq);
+
+      const tx = await signer.sendTransaction(txReq);
       const receipt = await tx.wait();
 
       // Пытаемся достать tokenId из события Transfer(address(0) -> to, tokenId)
       let mintedTokenId: string | null = null;
       try {
         const iface = new ethers.Interface(nft721Abi);
+        const transferTopic0 = ethers.id("Transfer(address,address,uint256)");
+        const nftAddr = ADDR.NFT721.toLowerCase();
+
         for (const log of receipt.logs) {
-          try {
-            const parsed = iface.parseLog(log);
-            if (parsed?.name === "Transfer") {
-              const from = String(parsed.args[0]);
-              const toAddr = String(parsed.args[1]);
-              const tk = parsed.args[2] as bigint;
-              if (from.toLowerCase() === ethers.ZeroAddress && toAddr.toLowerCase() === to.toLowerCase()) {
-                mintedTokenId = tk.toString();
-                break;
-              }
-            }
-          } catch {
-            // не наш лог — пропускаем
+          if (!log?.address || log.address.toLowerCase() !== nftAddr) continue;
+          if (!Array.isArray(log.topics) || log.topics[0] !== transferTopic0) continue;
+
+          const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+          const from = String(parsed.args[0]);
+          const toAddr = String(parsed.args[1]);
+          const tk = parsed.args[2] as bigint;
+
+          if (from.toLowerCase() === ethers.ZeroAddress && toAddr.toLowerCase() === to.toLowerCase()) {
+            mintedTokenId = tk.toString();
+            break;
           }
         }
       } catch {
