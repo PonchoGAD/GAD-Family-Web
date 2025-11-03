@@ -125,7 +125,7 @@ export default function Page() {
             {tab === "generate" ? (
               <div className="mt-4 space-y-4">
                 <textarea
-                  className="w-full rounded-xl bg-black/30 border border-white/10 px-3 py-3 outline-none"
+                  className="w全full rounded-xl bg-black/30 border border-white/10 px-3 py-3 outline-none"
                   rows={4}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -286,6 +286,12 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
       const provider = new BrowserProvider(eth);
       const signer = await provider.getSigner();
 
+      // ✅ sanity-check: контракт реально задеплоен?
+      const code = await provider.getCode(ADDR.NFT721);
+      if (!code || code === "0x") {
+        throw new Error(`No contract code at ${ADDR.NFT721}. Check address & network.`);
+      }
+
       const cBase = new Contract(ADDR.NFT721, nft721Abi, signer);
       const cRead = cBase as unknown as Nft721Read;
 
@@ -338,12 +344,17 @@ function MintBox({ image, onMinted }: { image: string | null; onMinted: (tokenId
 
       const to = await signer.getAddress();
 
-      // 👇 формируем data через populateTransaction и отправляем вручную
+      // формируем data через populateTransaction
       const fn = new Contract(ADDR.NFT721, nft721Abi, signer).getFunction("mintWithFee");
       const txReq = await fn.populateTransaction(to, tokenUri, { value: fee, gasLimit, gasPrice });
 
-      // симуляция, чтобы отловить revert до майнинга
-      await provider.call(txReq);
+      // симуляция (+ from) — это устраняет "missing revert data", когда узел требует from
+      try {
+        await provider.call({ ...txReq, from: to });
+      } catch (simErr) {
+        // Если симуляция без reason, покажем подсказку, но не блокируем
+        console.warn("Simulation failed (continuing to send):", simErr);
+      }
 
       const tx = await signer.sendTransaction(txReq);
       const receipt = await tx.wait();
