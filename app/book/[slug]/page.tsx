@@ -41,8 +41,7 @@ export default async function ChapterPage({ params }: Props) {
 
       <article className="prose prose-invert mt-8 max-w-none">
         {/* content comes pre-rendered as HTML */}
-        {/* eslint-disable-next-line react/no-danger */}
-        <div dangerouslySetInnerHTML={{ __html: content }} />
+         <div dangerouslySetInnerHTML={{ __html: content }} />
       </article>
 
       <div className="mt-10 rounded-2xl border border-white/10 p-4">
