@@ -1,0 +1,11 @@
+{
+  "slug": "daily-walk-quest",
+  "title": "Daily Walk Quest",
+  "type": "quest",
+  "reward": { "GAD": 100 },
+  "cooldownHours": 24,
+  "requirements": ["wallet-connected", "steps>3000"],
+  "cta": "Claim reward",
+  "verification": "server",
+  "ogImage": "/og/game-daily-walk.png"
+}
