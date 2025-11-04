@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadToys } from "@/lib/content";
+import { loadToysJson } from "@/lib/content-json";
 import type { Toy } from "@/lib/types";
+export const dynamic = "force-static";
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: "GAD Family — Toys",
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ToysPage() {
-  const toys: Toy[] = await loadToys();
+  const toys: Toy[] = await loadToysJson();
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-8">

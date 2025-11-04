@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadGames } from "@/lib/content";
+import { loadGamesJson } from "@/lib/content-json";
 import type { Game } from "@/lib/types";
+export const dynamic = "force-static";
+export const revalidate = false;
 
 export const metadata: Metadata = {
   title: "GAD Family — Games",
@@ -10,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GamesPage() {
-  const games: Game[] = await loadGames();
+  const games: Game[] = await loadGamesJson();
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-8">

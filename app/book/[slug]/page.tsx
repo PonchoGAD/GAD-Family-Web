@@ -4,8 +4,16 @@ import { notFound } from "next/navigation";
 import MDXContent from "@/app/book/components/MDXContent";
 import { loadChapterSource } from "@/lib/content";
 import type { ChapterSource } from "@/lib/types";
+import { loadChaptersMeta } from "@/lib/content";
 
 type Props = { params: { slug: string } };
+
+export async function generateStaticParams() {
+  const chapters = await loadChaptersMeta();
+  return chapters.map(c => ({ slug: c.slug }));
+}
+export const dynamic = "force-static";
+export const revalidate = false;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ch = await loadChapterSource(params.slug);
