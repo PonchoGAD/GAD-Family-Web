@@ -1,15 +1,17 @@
+// lib/content-mdx.ts
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import type { ChapterMeta, ChapterSource } from "./types";
+import { mdxLiteToHtml } from "./markdown";
 
 const ROOT = process.cwd();
 
 export async function loadChaptersMeta(): Promise<ChapterMeta[]> {
   const dir = path.join(ROOT, "content/book");
   if (!fs.existsSync(dir)) return [];
-  const files = fs.readdirSync(dir).filter(f => f.endsWith(".mdx"));
-  const metas = files.map(f => {
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".mdx"));
+  const metas = files.map((f) => {
     const raw = fs.readFileSync(path.join(dir, f), "utf8");
     const { data } = matter(raw);
     const meta: ChapterMeta = {
@@ -22,18 +24,19 @@ export async function loadChaptersMeta(): Promise<ChapterMeta[]> {
     };
     return meta;
   });
-  metas.sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+  metas.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return metas;
 }
 
 export async function loadChapterSource(slug: string): Promise<ChapterSource | null> {
-  const dir = path.join(process.cwd(), "content/book");
+  const dir = path.join(ROOT, "content/book");
   if (!fs.existsSync(dir)) return null;
-  const files = fs.readdirSync(dir).filter(f => f.endsWith(".mdx"));
+  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".mdx"));
   for (const f of files) {
     const raw = fs.readFileSync(path.join(dir, f), "utf8");
     const parsed = matter(raw);
     if (String(parsed.data.slug) === slug) {
+      const html = mdxLiteToHtml(parsed.content);
       return {
         frontmatter: {
           slug,
@@ -43,7 +46,7 @@ export async function loadChapterSource(slug: string): Promise<ChapterSource | n
           audio: parsed.data.audio ? String(parsed.data.audio) : undefined,
           ogImage: parsed.data.ogImage ? String(parsed.data.ogImage) : undefined,
         },
-        content: parsed.content,
+        content: html, // already HTML
       };
     }
   }

@@ -1,17 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import MDXContent from "@/app/book/components/MDXContent";
-import { loadChapterSource } from "@/lib/content";
+import { loadChaptersMeta, loadChapterSource } from "@/lib/content-mdx";
 import type { ChapterSource } from "@/lib/types";
-import { loadChaptersMeta } from "@/lib/content";
 
 type Props = { params: { slug: string } };
 
 export async function generateStaticParams() {
   const chapters = await loadChaptersMeta();
-  return chapters.map(c => ({ slug: c.slug }));
+  return chapters.map((c) => ({ slug: c.slug }));
 }
+
 export const dynamic = "force-static";
 export const revalidate = false;
 
@@ -29,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ChapterPage({ params }: Props) {
   const data: ChapterSource | null = await loadChapterSource(params.slug);
   if (!data) return notFound();
-  const { frontmatter, content } = data;
+  const { frontmatter, content } = data; // content is HTML
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -39,8 +38,11 @@ export default async function ChapterPage({ params }: Props) {
       <h1 className="mt-4 text-3xl font-semibold">{frontmatter.title}</h1>
       {frontmatter.teaser && <p className="mt-2 opacity-80">{frontmatter.teaser}</p>}
       {frontmatter.audio && <audio className="mt-6 w-full" controls src={frontmatter.audio} />}
+
       <article className="prose prose-invert mt-8 max-w-none">
-        <MDXContent source={content} />
+        {/* content comes pre-rendered as HTML */}
+        {/* eslint-disable-next-line react/no-danger */}
+        <div dangerouslySetInnerHTML={{ __html: content }} />
       </article>
 
       <div className="mt-10 rounded-2xl border border-white/10 p-4">
