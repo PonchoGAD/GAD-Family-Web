@@ -138,7 +138,7 @@ export default function MarketPage() {
         {!loading && items.length === 0 && <div className="mt-10 text-white/50">No active listings yet.</div>}
 
         <div className="mt-8 text-xs text-white/40">
-          Tip: если листите в USDT — укажите цену в точности под decimals USDT (часто 18 или 6).
+          Tip: when listing in USDT, set the price according to USDT’s decimals (commonly 18 or 6).
         </div>
       </div>
     </main>
