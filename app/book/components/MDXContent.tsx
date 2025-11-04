@@ -1,8 +1,8 @@
-"use client";
+// No "use client" here — server component!
 
 import { MDXRemote } from "next-mdx-remote/rsc";
 import Link from "next/link";
-import type { PropsWithChildren, ReactNode, ComponentType } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 
 function Intro({ children }: PropsWithChildren) {
   return <div className="rounded-2xl bg-white/5 p-4 leading-relaxed">{children}</div>;
@@ -16,12 +16,12 @@ function QuestLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
-// Explicit, no-any components map
 const components = {
   Intro,
   QuestLink,
-} satisfies Record<string, ComponentType<unknown>>;
+};
 
 export default function MDXContent({ source }: { source: string }) {
+  // In RSC mode MDXRemote can take raw MDX string
   return <MDXRemote source={source} components={components} />;
 }
