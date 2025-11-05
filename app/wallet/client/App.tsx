@@ -60,6 +60,16 @@ function AppInner() {
   // 🔑 из провайдера (для сессии без повторного пароля)
   const { setSession } = useUnlock();
 
+  // ---------- локальные модалки ----------
+  const [pwdOpenModal, setPwdOpenModal] = useState(false);
+  const [pwdInput, setPwdInput] = useState('');
+  const [pwdError, setPwdError] = useState<string | null>(null);
+
+  const [seedOpenModal, setSeedOpenModal] = useState(false);
+  const [seedInput, setSeedInput] = useState('');
+  const [seedPwdInput, setSeedPwdInput] = useState('');
+  const [seedError, setSeedError] = useState<string | null>(null);
+
   // Reset action
   const DangerReset = useMemo(
     () => () => {
@@ -78,15 +88,24 @@ function AppInner() {
     setStage('create-step1');
   }
 
-  // ✅ async/await
-  async function openExistingWalletAction() {
-    const pwd = window.prompt('Enter your wallet password');
-    if (!pwd) return;
+  // Открытие существующего — теперь через модалку ввода пароля
+  function openExistingWalletAction() {
+    setPwdInput('');
+    setPwdError(null);
+    setPwdOpenModal(true);
+  }
 
+  async function doOpenExistingWithPassword() {
+    setPwdError(null);
+    const pwd = pwdInput.trim();
+    if (!pwd) {
+      setPwdError('Password is required');
+      return;
+    }
     try {
       const m = await getEncryptedMnemonic(pwd);
       if (!m) {
-        window.alert('Wrong password or no wallet found');
+        setPwdError('Wrong password or no wallet found');
         return;
       }
       const addr = deriveAddressFromMnemonic(m, 0) as Address;
@@ -99,10 +118,56 @@ function AppInner() {
       const savedName = localStorage.getItem('walletName') || 'My Wallet';
       setWalletName(savedName);
       setStage('dashboard');
+      setPwdOpenModal(false);
+      setPwdInput('');
+      setPwdError(null);
       console.debug('[Wallet] stage -> dashboard (open existing)');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to open wallet';
-      window.alert(msg);
+      setPwdError(msg);
+    }
+  }
+
+  // Импорт по сид-фразе — модалка
+  function openImportSeedModal() {
+    setSeedInput('');
+    setSeedPwdInput('');
+    setSeedError(null);
+    setSeedOpenModal(true);
+  }
+
+  async function doImportBySeed() {
+    setSeedError(null);
+    const phrase = seedInput.trim().replace(/\s+/g, ' ');
+    const pwd = seedPwdInput.trim();
+
+    if (!phrase || phrase.split(' ').length < 12) {
+      setSeedError('Enter valid 12+ word seed phrase');
+      return;
+    }
+    if (!pwd) {
+      setSeedError('Password is required to encrypt wallet');
+      return;
+    }
+
+    try {
+      await setEncryptedMnemonic(phrase, pwd);
+      localStorage.setItem('walletName', walletName.trim() || 'My Wallet');
+
+      const addr = deriveAddressFromMnemonic(phrase, 0) as Address;
+      setAddress(addr);
+      setMnemonic(phrase);
+      setSession(phrase); // сразу сессия на 20 минут
+      setStage('dashboard');
+
+      setSeedOpenModal(false);
+      setSeedInput('');
+      setSeedPwdInput('');
+      setSeedError(null);
+      console.debug('[Wallet] stage -> dashboard (imported by seed)');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to import';
+      setSeedError(msg);
     }
   }
 
@@ -221,7 +286,7 @@ function AppInner() {
             A self-custody wallet for BSC (BNB). Save your 12 words securely.
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-3 mt-6">
+          <div className="grid sm:grid-cols-3 gap-3 mt-6">
             <button
               type="button"
               onClick={createNewWalletAction}
@@ -236,8 +301,91 @@ function AppInner() {
             >
               Open existing
             </button>
+            <button
+              type="button"
+              onClick={openImportSeedModal}
+              className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+            >
+              Import by seed
+            </button>
           </div>
         </div>
+
+        {/* Модалка: вход по паролю */}
+        {pwdOpenModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="w-full max-w-md rounded-2xl border border-[#2c3344] bg-[#0B0C10] p-6">
+              <div className="text-xl font-bold">Unlock Wallet</div>
+              <div className="text-sm opacity-80 mt-1">Enter your wallet password</div>
+              <input
+                type="password"
+                value={pwdInput}
+                onChange={(e) => setPwdInput(e.currentTarget.value)}
+                className="mt-4 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
+                placeholder="Password"
+                autoFocus
+              />
+              {pwdError && <div className="mt-2 text-red-400 text-sm">{pwdError}</div>}
+              <div className="mt-4 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPwdOpenModal(false)}
+                  className="px-4 py-2 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={doOpenExistingWithPassword}
+                  className="px-4 py-2 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
+                >
+                  Unlock
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Модалка: импорт по сид-фразе */}
+        {seedOpenModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div className="w-full max-w-lg rounded-2xl border border-[#2c3344] bg-[#0B0C10] p-6">
+              <div className="text-xl font-bold">Import by seed phrase</div>
+              <div className="text-sm opacity-80 mt-1">Paste your 12/24-word recovery phrase</div>
+              <textarea
+                value={seedInput}
+                onChange={(e) => setSeedInput(e.currentTarget.value)}
+                className="mt-4 w-full min-h-[120px] bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
+                placeholder="twelve words separated by spaces"
+              />
+              <div className="text-sm opacity-80 mt-3">Set password to encrypt locally</div>
+              <input
+                type="password"
+                value={seedPwdInput}
+                onChange={(e) => setSeedPwdInput(e.currentTarget.value)}
+                className="mt-2 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
+                placeholder="New password"
+              />
+              {seedError && <div className="mt-2 text-red-400 text-sm">{seedError}</div>}
+              <div className="mt-4 flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSeedOpenModal(false)}
+                  className="px-4 py-2 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={doImportBySeed}
+                  className="px-4 py-2 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

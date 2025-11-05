@@ -10,6 +10,8 @@ type UnlockCtx = {
   address?: Address;
   /** Если залочено — спросит пароль, расшифрует и запустит 20-минутную сессию */
   requireUnlock: () => Promise<void>;
+  /** Вариант без prompt: расшифровать по паролю и запустить сессию */
+  unlockWithPassword: (password: string) => Promise<void>;
   /** Возвращает актуальную мнемонику из памяти. Если залочено — кидает ошибку. */
   getMnemonic: () => string;
   /** Прямо установить сессию (используем сразу после Create/Open), без ввода пароля повторно */
@@ -64,7 +66,7 @@ export function UnlockProvider({ children }: { children: React.ReactNode }) {
       const addr = deriveAddressFromMnemonic(mnemonic, 0) as Address;
       setAddress(addr);
     } catch {
-      // ignore, пусть адрес будет недоступен — это не критично для Send/Receive
+      // ignore
     }
     startTtl();
   }, [startTtl]);
@@ -75,6 +77,14 @@ export function UnlockProvider({ children }: { children: React.ReactNode }) {
     }
     return mnemonicRef.current;
   }, [isUnlocked]);
+
+  const unlockWithPassword = useCallback(async (password: string) => {
+    const pwd = password.trim();
+    if (!pwd) throw new Error('Password is required');
+    const m = await getEncryptedMnemonic(pwd);
+    if (!m) throw new Error('Wrong password or no wallet found');
+    setSession(m);
+  }, [setSession]);
 
   const requireUnlock = useCallback(async () => {
     // уже есть валидная сессия?
@@ -114,10 +124,11 @@ export function UnlockProvider({ children }: { children: React.ReactNode }) {
     isUnlocked,
     address,
     requireUnlock,
+    unlockWithPassword,
     getMnemonic,
     setSession,
     lockNow,
-  }), [address, getMnemonic, isUnlocked, lockNow, requireUnlock, setSession]);
+  }), [address, getMnemonic, isUnlocked, lockNow, requireUnlock, setSession, unlockWithPassword]);
 
   return <UnlockContext.Provider value={value}>{children}</UnlockContext.Provider>;
 }
