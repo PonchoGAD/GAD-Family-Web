@@ -1,4 +1,3 @@
-// src/wallet/core/services/send.ts
 import {
   sendTransaction,
   waitForTransactionReceipt,
@@ -10,7 +9,7 @@ import { config } from "@/app/nft/wagmi";
 import { bsc } from "wagmi/chains";
 
 // ✅ безопасные утилы адресов
-import { normalizeRecipient, toErc20Address } from "../utils/safeAddresses";
+import { normalizeRecipient, toErc20Address, WBNB } from "../utils/safeAddresses";
 
 /** Литеральный chainId для типов waitForTransactionReceipt */
 const CHAIN_ID = 56 as const;
@@ -93,8 +92,30 @@ export async function sendNative(
  * 2) legacy: sendERC20(privKey, token, to, amountWeiBigint)
  */
 
-// ⬇️ локальный union для точной типизации входа в toErc20Address
+// ⬇️ локальный union для точной типизации входа
 type TokenLike = `0x${string}` | "BNB" | "WBNB" | "GAD" | "USDT";
+
+/**
+ * Безопасно резолвит адрес токена из TokenLike.
+ * - "WBNB" -> WBNB (константа)
+ * - "BNB"  -> toErc20Address("BNB")  (вернёт WBNB)
+ * - 0x...  -> toErc20Address(0x...)  (нормализация)
+ * - другие символы (например, "GAD"/"USDT") → явная ошибка до конфигурации адресов
+ */
+function resolveTokenAddress(tokenLike: TokenLike): `0x${string}` {
+  if (tokenLike === "WBNB") return WBNB;
+  if (tokenLike === "BNB") return toErc20Address("BNB");
+
+  // hex-адрес
+  if (typeof tokenLike === "string" && tokenLike.startsWith("0x")) {
+    return toErc20Address(tokenLike as `0x${string}`);
+  }
+
+  // сюда попадут "GAD" / "USDT" (и любые иные символы)
+  throw new Error(
+    `Unknown token symbol '${tokenLike}'. Please provide an explicit 0x-address or configure mapping.`
+  );
+}
 
 export async function sendERC20(
   token: `0x${string}`,
@@ -125,14 +146,14 @@ export async function sendERC20(
 
   if (isLegacy) {
     // legacy: (privKey, token, to, amountWei)
-    const tokenLike = args[1] as TokenLike;                      // ✅ сузили тип
-    token = toErc20Address(tokenLike) as `0x${string}`;          // ✅ BNB/NATIVE → WBNB
+    const tokenLike = args[1] as TokenLike;
+    token = resolveTokenAddress(tokenLike);                      // ✅ корректная типизация
     to = normalizeRecipient(args[2]) as `0x${string}`;           // ✅ запрет NATIVE + checksum
     amount = args[3] as bigint;
   } else {
     // new: (token, to, amountHumanStr, decimals?)
-    const tokenLike = args[0] as TokenLike;                      // ✅ сузили тип
-    token = toErc20Address(tokenLike) as `0x${string}`;          // ✅ BNB/NATIVE → WBNB
+    const tokenLike = args[0] as TokenLike;
+    token = resolveTokenAddress(tokenLike);                      // ✅ корректная типизация
     to = normalizeRecipient(args[1]) as `0x${string}`;           // ✅ запрет NATIVE + checksum
     const amountHuman = args[2] as string;
     const decimals = (args[3] as number | undefined) ?? 18;
