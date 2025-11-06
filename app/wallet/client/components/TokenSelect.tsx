@@ -16,36 +16,35 @@ type BaseProps = {
   className?: string;
 };
 
-// ⬇️ В этом client-компоненте нам нужен проп onChange.
-// Next TS rule 71007 требует special naming для Server Action,
-// но здесь это НЕ server action. Сохраняем API и подавляем чек точечно.
-type Props = BaseProps & { onChange?: (t: TokenMeta) => void };
+// ⬇️ Этот client-компонент принимает onChange как обычный колбэк.
+// Это НЕ Server Action. Оставляем API как есть, без any.
+type Props = BaseProps & {
+  onChange?: (t: TokenMeta) => void;
+  // опционально: показать кнопку управления токенами (диалог)
+  onManageAction?: () => void;
+  showManageButton?: boolean;
+};
 
-export default function TokenSelect(
-  {
-    value,
-    tokens,
-    onChange,
-    className = '',
-  }: Props
-) {
+export default function TokenSelect({
+  value,
+  tokens,
+  onChange,
+  className = '',
+  onManageAction,
+  showManageButton = false,
+}: Props) {
   const [open, setOpen] = useState(false);
 
   const list = useMemo(() => {
-    // лёгкая нормализация и сортировка по символу
     const unique = new Map<string, TokenMeta>();
     for (const t of tokens) {
       const key = `${t.symbol?.toUpperCase()}_${t.address}`;
       if (!unique.has(key)) unique.set(key, t);
     }
-    return Array.from(unique.values()).sort((a, b) =>
-      a.symbol.localeCompare(b.symbol)
-    );
+    return Array.from(unique.values()).sort((a, b) => a.symbol.localeCompare(b.symbol));
   }, [tokens]);
 
-  const selectedLabel = value
-    ? `${value.symbol}${value.symbol?.toUpperCase() === 'BNB' ? '' : ''}`
-    : 'Select token';
+  const selectedLabel = value ? `${value.symbol}` : 'Select token';
 
   function pickToken(t: TokenMeta) {
     setOpen(false);
@@ -94,12 +93,29 @@ export default function TokenSelect(
               <span className="font-semibold">{t.symbol}</span>
               {t.name && <span className="opacity-60 text-xs">· {t.name}</span>}
               <span className="ml-auto opacity-40 text-xs">
-                {t.address === 'BNB' ? 'Native' : (t.address as string).slice(0, 6) + '…' + (t.address as string).slice(-4)}
+                {t.address === 'BNB'
+                  ? 'Native'
+                  : (t.address as string).slice(0, 6) + '…' + (t.address as string).slice(-4)}
               </span>
             </button>
           ))}
           {list.length === 0 && (
             <div className="px-3 py-2 opacity-70 text-sm">No tokens</div>
+          )}
+
+          {showManageButton && (
+            <div className="sticky bottom-0 bg-[#0f1420] border-t border-[#2c3344] p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onManageAction?.();
+                }}
+                className="w-full text-center px-3 py-2 rounded-lg bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344] font-semibold"
+              >
+                Manage tokens
+              </button>
+            </div>
           )}
         </div>
       )}

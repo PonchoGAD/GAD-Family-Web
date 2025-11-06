@@ -1,18 +1,23 @@
-'use client';
+'use client'; 
 
 import React, { useMemo, useState } from 'react';
 import WalletHome from './screens/WalletHome';
 import SendScreen from './screens/SendScreen';
 import ReceiveScreen from './screens/ReceiveScreen';
 import SwapScreen from './screens/SwapScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import type { Address } from 'viem';
 import { deriveAddressFromMnemonic, generateMnemonic12 } from '@wallet/core/services/seed';
 import { getEncryptedMnemonic, setEncryptedMnemonic, clearAll } from '@wallet/adapters/storage.web';
 
-// 🔒 провайдер одноразовой разблокировки (20 мин)
+// 🔒 провайдер одноразовой разблокировки
 import { UnlockProvider, useUnlock } from '@/src/wallet/core/state/UnlockProvider';
 
-type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap';
+// 🧩 диалоги (пути относительно текущей папки)
+import UnlockDialog from './components/UnlockDialog';
+import SeedImportDialog from './components/SeedImportDialog';
+
+type Tab = 'Wallet' | 'Send' | 'Receive' | 'Swap' | 'Settings';
 type Stage = 'landing' | 'create-step1' | 'create-step2' | 'open' | 'dashboard';
 
 function DownloadBanner() {
@@ -36,7 +41,7 @@ function DownloadBanner() {
   );
 }
 
-// Обворачиваем реальную логику в провайдер
+// Обёртка провайдером
 export default function App() {
   return (
     <UnlockProvider>
@@ -57,20 +62,13 @@ function AppInner() {
   // Active wallet state
   const [address, setAddress] = useState<Address | null>(null);
 
-  // 🔑 из провайдера (для сессии без повторного пароля)
-  const { setSession } = useUnlock();
+  // из провайдера — для сессии и чтения seed после анлока
+  const { setSession, getMnemonic, isUnlocked } = useUnlock();
 
-  // ---------- локальные модалки ----------
-  const [pwdOpenModal, setPwdOpenModal] = useState(false);
-  const [pwdInput, setPwdInput] = useState('');
-  const [pwdError, setPwdError] = useState<string | null>(null);
+  // модальные окна
+  const [unlockOpen, setUnlockOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
-  const [seedOpenModal, setSeedOpenModal] = useState(false);
-  const [seedInput, setSeedInput] = useState('');
-  const [seedPwdInput, setSeedPwdInput] = useState('');
-  const [seedError, setSeedError] = useState<string | null>(null);
-
-  // Reset action
   const DangerReset = useMemo(
     () => () => {
       clearAll();
@@ -80,7 +78,7 @@ function AppInner() {
     []
   );
 
-  // Handlers: Landing
+  // Landing
   function createNewWalletAction() {
     setWalletName('');
     setConfirmStored(false);
@@ -88,90 +86,32 @@ function AppInner() {
     setStage('create-step1');
   }
 
-  // Открытие существующего — теперь через модалку ввода пароля
-  function openExistingWalletAction() {
-    setPwdInput('');
-    setPwdError(null);
-    setPwdOpenModal(true);
-  }
+  // Сохранена кнопка "Open existing" (prompt) для совместимости
+  async function openExistingWalletAction() {
+    const pwd = window.prompt('Enter your wallet password');
+    if (!pwd) return;
 
-  async function doOpenExistingWithPassword() {
-    setPwdError(null);
-    const pwd = pwdInput.trim();
-    if (!pwd) {
-      setPwdError('Password is required');
-      return;
-    }
     try {
       const m = await getEncryptedMnemonic(pwd);
       if (!m) {
-        setPwdError('Wrong password or no wallet found');
+        window.alert('Wrong password or no wallet found');
         return;
       }
       const addr = deriveAddressFromMnemonic(m, 0) as Address;
-
-      // ⚡️ кладём расшифрованную фразу в сессию на 20 минут
       setSession(m);
-
       setMnemonic(m);
       setAddress(addr);
       const savedName = localStorage.getItem('walletName') || 'My Wallet';
       setWalletName(savedName);
       setStage('dashboard');
-      setPwdOpenModal(false);
-      setPwdInput('');
-      setPwdError(null);
       console.debug('[Wallet] stage -> dashboard (open existing)');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to open wallet';
-      setPwdError(msg);
+      window.alert(msg);
     }
   }
 
-  // Импорт по сид-фразе — модалка
-  function openImportSeedModal() {
-    setSeedInput('');
-    setSeedPwdInput('');
-    setSeedError(null);
-    setSeedOpenModal(true);
-  }
-
-  async function doImportBySeed() {
-    setSeedError(null);
-    const phrase = seedInput.trim().replace(/\s+/g, ' ');
-    const pwd = seedPwdInput.trim();
-
-    if (!phrase || phrase.split(' ').length < 12) {
-      setSeedError('Enter valid 12+ word seed phrase');
-      return;
-    }
-    if (!pwd) {
-      setSeedError('Password is required to encrypt wallet');
-      return;
-    }
-
-    try {
-      await setEncryptedMnemonic(phrase, pwd);
-      localStorage.setItem('walletName', walletName.trim() || 'My Wallet');
-
-      const addr = deriveAddressFromMnemonic(phrase, 0) as Address;
-      setAddress(addr);
-      setMnemonic(phrase);
-      setSession(phrase); // сразу сессия на 20 минут
-      setStage('dashboard');
-
-      setSeedOpenModal(false);
-      setSeedInput('');
-      setSeedPwdInput('');
-      setSeedError(null);
-      console.debug('[Wallet] stage -> dashboard (imported by seed)');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to import';
-      setSeedError(msg);
-    }
-  }
-
-  // Handlers: Create (Step 1)
+  // Step 1
   function continueFromStep1Action() {
     const name = walletName.trim();
     if (!name) {
@@ -186,7 +126,7 @@ function AppInner() {
       }
       setMnemonic(m12);
       setStage('create-step2');
-      console.debug('[Wallet] stage -> create-step2');
+      console.debug('[Wallet] stage -> create-step2]');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unexpected error on mnemonic generation';
       console.error('[Wallet] continueFromStep1Action error:', e);
@@ -194,7 +134,7 @@ function AppInner() {
     }
   }
 
-  // Handlers: Create (Step 2)
+  // Step 2
   function copyMnemonicAction() {
     navigator.clipboard
       .writeText(mnemonic)
@@ -234,7 +174,7 @@ function AppInner() {
       setWalletName(name);
       setStage('dashboard');
 
-      // ⚡️ кладём фразу в сессию сразу после создания, чтобы не спрашивать пароль на Send/Receive/Swap
+      // кладём фразу в сессию — не спрашиваем пароль на Send/Receive/Swap
       setSession(m);
 
       console.debug('[Wallet] stage -> dashboard (created)');
@@ -254,7 +194,7 @@ function AppInner() {
 
           {stage === 'dashboard' && (
             <div className="flex gap-2">
-              {(['Wallet', 'Send', 'Receive', 'Swap'] as const).map((t) => (
+              {(['Wallet', 'Send', 'Receive', 'Swap', 'Settings'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -268,9 +208,31 @@ function AppInner() {
             </div>
           )}
 
-          <button onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
-            reset
-          </button>
+          <div className="flex gap-2">
+            {stage !== 'dashboard' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setUnlockOpen(true)}
+                  className="px-3 py-2 rounded-lg bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+                  title="Unlock wallet"
+                >
+                  Unlock
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(true)}
+                  className="px-3 py-2 rounded-lg bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+                  title="Import by seed"
+                >
+                  Import
+                </button>
+              </>
+            )}
+            <button onClick={DangerReset} className="px-3 py-2 rounded-lg bg-[#392222] text-red-200">
+              reset
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -286,7 +248,7 @@ function AppInner() {
             A self-custody wallet for BSC (BNB). Save your 12 words securely.
           </div>
 
-          <div className="grid sm:grid-cols-3 gap-3 mt-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6">
             <button
               type="button"
               onClick={createNewWalletAction}
@@ -294,16 +256,27 @@ function AppInner() {
             >
               Create new wallet
             </button>
+
+            {/* prompt-вход для совместимости */}
             <button
               type="button"
               onClick={openExistingWalletAction}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
-              Open existing
+              Open existing (prompt)
             </button>
+
             <button
               type="button"
-              onClick={openImportSeedModal}
+              onClick={() => setUnlockOpen(true)}
+              className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
+            >
+              Unlock (UI)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
               className="px-4 py-3 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
             >
               Import by seed
@@ -311,81 +284,37 @@ function AppInner() {
           </div>
         </div>
 
-        {/* Модалка: вход по паролю */}
-        {pwdOpenModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="w-full max-w-md rounded-2xl border border-[#2c3344] bg-[#0B0C10] p-6">
-              <div className="text-xl font-bold">Unlock Wallet</div>
-              <div className="text-sm opacity-80 mt-1">Enter your wallet password</div>
-              <input
-                type="password"
-                value={pwdInput}
-                onChange={(e) => setPwdInput(e.currentTarget.value)}
-                className="mt-4 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
-                placeholder="Password"
-                autoFocus
-              />
-              {pwdError && <div className="mt-2 text-red-400 text-sm">{pwdError}</div>}
-              <div className="mt-4 flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setPwdOpenModal(false)}
-                  className="px-4 py-2 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={doOpenExistingWithPassword}
-                  className="px-4 py-2 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
-                >
-                  Unlock
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Диалоги рендерим здесь для Landing */}
+        <UnlockDialog
+          open={unlockOpen}
+          onCloseAction={() => setUnlockOpen(false)}
+          // ❗ Используем onUnlockedAction (а не onUnlockAction)
+          onUnlockedAction={() => {
+            try {
+              const m = getMnemonic();
+              const addr = deriveAddressFromMnemonic(m, 0) as Address;
+              setAddress(addr);
+            } catch {
+              // дашборд всё равно откроется; адрес подтянем позже
+            }
+            const savedName = localStorage.getItem('walletName') || 'My Wallet';
+            setWalletName(savedName);
+            setStage('dashboard');
+          }}
+        />
 
-        {/* Модалка: импорт по сид-фразе */}
-        {seedOpenModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-            <div className="w-full max-w-lg rounded-2xl border border-[#2c3344] bg-[#0B0C10] p-6">
-              <div className="text-xl font-bold">Import by seed phrase</div>
-              <div className="text-sm opacity-80 mt-1">Paste your 12/24-word recovery phrase</div>
-              <textarea
-                value={seedInput}
-                onChange={(e) => setSeedInput(e.currentTarget.value)}
-                className="mt-4 w-full min-h-[120px] bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
-                placeholder="twelve words separated by spaces"
-              />
-              <div className="text-sm opacity-80 mt-3">Set password to encrypt locally</div>
-              <input
-                type="password"
-                value={seedPwdInput}
-                onChange={(e) => setSeedPwdInput(e.currentTarget.value)}
-                className="mt-2 w-full bg-[#10141E] border border-[#2c3344] rounded-xl px-4 py-3 outline-none"
-                placeholder="New password"
-              />
-              {seedError && <div className="mt-2 text-red-400 text-sm">{seedError}</div>}
-              <div className="mt-4 flex gap-2 justify-end">
-                <button
-                  type="button"
-                  onClick={() => setSeedOpenModal(false)}
-                  className="px-4 py-2 rounded-xl font-semibold bg-[#1F2430] hover:bg-[#242a39] border border-[#2c3344]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={doImportBySeed}
-                  className="px-4 py-2 rounded-xl font-semibold bg-[#0A84FF] hover:bg-[#1a8cff]"
-                >
-                  Import
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <SeedImportDialog
+          open={importOpen}
+          onCloseAction={() => setImportOpen(false)}
+          // ✅ ожидается (addr: `0x${string}`) => void
+          onImportedAction={(addr: Address) => {
+            setAddress(addr);
+            const savedName =
+              localStorage.getItem('walletName') || (walletName ? walletName : 'My Wallet');
+            setWalletName(savedName);
+            setStage('dashboard');
+          }}
+        />
       </div>
     );
   }
@@ -489,12 +418,26 @@ function AppInner() {
 
   function Dashboard() {
     if (!address) {
+      // пробуем восстановить адрес из активной сессии (если разблокировано UI-диalogом)
+      try {
+        if (isUnlocked) {
+          const m = getMnemonic();
+          const addr = deriveAddressFromMnemonic(m, 0) as Address;
+          if (addr) setAddress(addr);
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!address) {
       return (
         <div className="w-full h-[60vh] flex items-center justify-center text-white">
           Initializing wallet…
         </div>
       );
     }
+
     return (
       <div className="max-w-5xl mx-auto px-4 py-6">
         <DownloadBanner />
@@ -510,6 +453,7 @@ function AppInner() {
         {tab === 'Send' && <SendScreen />}
         {tab === 'Receive' && <ReceiveScreen />}
         {tab === 'Swap' && <SwapScreen />}
+        {tab === 'Settings' && <SettingsScreen />}
       </div>
     );
   }
@@ -522,6 +466,36 @@ function AppInner() {
       {stage === 'create-step2' && <CreateStep2 />}
       {stage === 'open' && <Landing />}
       {stage === 'dashboard' && <Dashboard />}
+
+      {/* Глобальные диалоги (если нужно вызывать не из Landing) */}
+      <UnlockDialog
+        open={unlockOpen}
+        onCloseAction={() => setUnlockOpen(false)}
+        onUnlockedAction={() => {
+          try {
+            const m = getMnemonic();
+            const addr = deriveAddressFromMnemonic(m, 0) as Address;
+            setAddress(addr);
+          } catch {
+            // ignore
+          }
+          const savedName = localStorage.getItem('walletName') || 'My Wallet';
+          setWalletName(savedName);
+          setStage('dashboard');
+        }}
+      />
+      <SeedImportDialog
+        open={importOpen}
+        onCloseAction={() => setImportOpen(false)}
+        // ✅ ожидается (addr: `0x${string}`) => void
+        onImportedAction={(addr: Address) => {
+          setAddress(addr);
+          const savedName =
+            localStorage.getItem('walletName') || (walletName ? walletName : 'My Wallet');
+          setWalletName(savedName);
+          setStage('dashboard');
+        }}
+      />
     </div>
   );
 }
