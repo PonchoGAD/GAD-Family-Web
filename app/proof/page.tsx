@@ -1,8 +1,8 @@
-// app/proof/page.tsx
 import React from "react";
 import Link from "next/link";
-import { CONTRACTS } from "./contracts";
 import type { Metadata } from "next";
+import { CONTRACTS } from "./contracts";
+import CopyButton from "./CopyButton";
 
 function short(addr: string) {
   return addr.slice(0, 6) + "…" + addr.slice(-4);
@@ -84,12 +84,7 @@ export default function ProofPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-4">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(c.address)}
-                      className="rounded-md border border-neutral-700 px-3 py-1.5 text-xs text-neutral-200 hover:bg-neutral-800"
-                    >
-                      Copy
-                    </button>
+                    <CopyButton value={c.address} />
                   </td>
                 </tr>
               );
@@ -110,11 +105,7 @@ export default function ProofPage() {
                 : `https://bscscan.com/address/${c.address}`;
             return (
               <li key={c.address} className="text-sm">
-                <a
-                  href={scanUrl}
-                  target="_blank"
-                  className="text-sky-300 hover:underline"
-                >
+                <a href={scanUrl} target="_blank" className="text-sky-300 hover:underline">
                   {c.name} — {c.address}
                 </a>
               </li>
@@ -124,37 +115,37 @@ export default function ProofPage() {
       </section>
 
       {/* About the project */}
-<section className="mt-12">
-  <h2 className="text-lg font-medium text-neutral-100">About the Project</h2>
-  <p className="mt-3 text-sm text-neutral-300">
-    <strong>GAD Family</strong> is a next-generation Web3 ecosystem designed to connect real-life value
-    with digital ownership. Built around the GAD token, it merges <strong>Move-to-Earn mechanics,
-    DAO governance, and NFT utilities</strong> into a single transparent framework that empowers families,
-    investors, and communities to grow together.
-  </p>
-  <p className="mt-3 text-sm text-neutral-300">
-    The core vision of GAD is to create a self-sustaining, family-oriented digital economy
-    where <strong>health, participation, and ownership</strong> become rewarding. Every step, vote, and
-    contribution inside the ecosystem generates measurable impact—reflected through token rewards,
-    DAO participation, and NFT-driven digital assets.
-  </p>
-  <p className="mt-3 text-sm text-neutral-300">
-    The ecosystem operates through verifiable smart contracts on the <strong>BNB Smart Chain</strong>,
-    including staking modules, DAO governance (Governor + xGAD), the Launchpad for early investors,
-    and a full NFT infrastructure (Marketplace, Vault, and Collection contracts). All key operations,
-    from liquidity locks to vesting schedules, are fully visible on-chain.
-  </p>
-  <p className="mt-3 text-sm text-neutral-300">
-    <strong>Roadmap focus:</strong> 2025–2026 will see the integration of the <strong>GAD App</strong> (Move-to-Earn + Family Map),
-    cross-chain bridge expansion, multi-token farming, and AI-driven personalization of user goals.
-    Each release builds toward a scalable, transparent, and community-owned financial ecosystem
-    ready for mainstream adoption.
-  </p>
-  <p className="mt-3 text-sm text-neutral-400">
-    Transparency is not just a feature — it is the foundation of trust. Every smart contract,
-    transaction, and treasury action can be verified directly through the links above.
-  </p>
-</section>
+      <section className="mt-12">
+        <h2 className="text-lg font-medium text-neutral-100">About the Project</h2>
+        <p className="mt-3 text-sm text-neutral-300">
+          <strong>GAD Family</strong> is a next-generation Web3 ecosystem designed to connect real-life value
+          with digital ownership. Built around the GAD token, it merges <strong>Move-to-Earn mechanics,
+          DAO governance, and NFT utilities</strong> into a single transparent framework that empowers families,
+          investors, and communities to grow together.
+        </p>
+        <p className="mt-3 text-sm text-neutral-300">
+          The core vision of GAD is to create a self-sustaining, family-oriented digital economy
+          where <strong>health, participation, and ownership</strong> become rewarding. Every step, vote, and
+          contribution inside the ecosystem generates measurable impact—reflected through token rewards,
+          DAO participation, and NFT-driven digital assets.
+        </p>
+        <p className="mt-3 text-sm text-neutral-300">
+          The ecosystem operates through verifiable smart contracts on the <strong>BNB Smart Chain</strong>,
+          including staking modules, DAO governance (Governor + xGAD), the Launchpad for early investors,
+          and a full NFT infrastructure (Marketplace, Vault, and Collection contracts). All key operations,
+          from liquidity locks to vesting schedules, are fully visible on-chain.
+        </p>
+        <p className="mt-3 text-sm text-neutral-300">
+          <strong>Roadmap focus:</strong> 2025–2026 will see the integration of the <strong>GAD App</strong> (Move-to-Earn + Family Map),
+          cross-chain bridge expansion, multi-token farming, and AI-driven personalization of user goals.
+          Each release builds toward a scalable, transparent, and community-owned financial ecosystem
+          ready for mainstream adoption.
+        </p>
+        <p className="mt-3 text-sm text-neutral-400">
+          Transparency is not just a feature — it is the foundation of trust. Every smart contract,
+          transaction, and treasury action can be verified directly through the links above.
+        </p>
+      </section>
 
       <footer className="mt-8 text-xs text-neutral-500">
         Last updated: November 2025 • Network: BNB Smart Chain (BSC)
