@@ -59,6 +59,14 @@ export default function NavBar() {
           >
             DAO
           </Link>
+
+          {/* Proof */}
+          <Link
+            href="/proof"
+            className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:bg-[#e6bf59] transition"
+          >
+            Proof
+          </Link>
         </div>
       </nav>
     </header>
