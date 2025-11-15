@@ -1,12 +1,17 @@
 'use client';
 
 import React from 'react';
-import { JsonRpcProvider, Contract, parseEther, formatEther } from 'ethers';
+import {
+  JsonRpcProvider,
+  BrowserProvider,
+  Eip1193Provider,
+  Contract,
+  parseEther,
+  formatEther,
+} from 'ethers';
 import { launchpadAbi } from '../abis/LaunchpadSaleV3';
 import { erc20Abi } from '../abis/ERC20';
 import { LAUNCHPAD_ADDRESS, USDT_ADDRESS } from '../config/launchpad';
-import { useWallet } from '../nft/hooks/useWallet';
-import WalletConnectButton from '../components/WalletConnectButton';
 
 type LaunchpadState = {
   owner: string;
@@ -43,9 +48,22 @@ function toDate(ts?: bigint) {
   return d.toUTCString().replace('GMT', 'UTC');
 }
 
+type EthereumLike = { ethereum?: Eip1193Provider };
+
+// аккуратно достаём window.ethereum без any
+function getEth(): Eip1193Provider | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as EthereumLike;
+  return w.ethereum ?? null;
+}
+
 export default function LaunchpadClient() {
-  // общий хук кошелька из NFT-модуля
-  const { signer, account } = useWallet();
+  // Локальное подключение кошелька (как на /earn)
+  const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
+  const [account, setAccount] = React.useState<string>('');
+  const [chainId, setChainId] = React.useState<number | null>(null);
+  const [walletErr, setWalletErr] = React.useState<string>('');
+  const [isConnecting, setIsConnecting] = React.useState(false);
 
   const [data, setData] = React.useState<LaunchpadState | null>(null);
   const [isOwner, setIsOwner] = React.useState(false);
@@ -58,6 +76,40 @@ export default function LaunchpadClient() {
     () => new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, readProvider),
     [],
   );
+
+  // ====== Подключение / отключение кошелька ======
+
+  const connectWallet = React.useCallback(async () => {
+    setWalletErr('');
+    setIsConnecting(true);
+    try {
+      const eth = getEth();
+      if (!eth) {
+        setWalletErr('MetaMask not found');
+        return;
+      }
+      const prov = new BrowserProvider(eth);
+      await prov.send('eth_requestAccounts', []);
+      const net = await prov.getNetwork();
+      setChainId(Number(net.chainId));
+      const signer = await prov.getSigner();
+      const addr = await signer.getAddress();
+      setAccount(addr);
+      setProvider(prov);
+    } catch (e) {
+      const errObj = e as { message?: string };
+      setWalletErr(errObj?.message ?? 'Wallet connect failed');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, []);
+
+  const disconnectWallet = React.useCallback(() => {
+    setProvider(null);
+    setAccount('');
+    setChainId(null);
+    setWalletErr('');
+  }, []);
 
   // =========================
   // Загрузка данных
@@ -105,7 +157,7 @@ export default function LaunchpadClient() {
       ]);
 
       const lowerOwner = String(owner).toLowerCase();
-      const lowerAcc = (account ?? '').toLowerCase();
+      const lowerAcc = account.toLowerCase();
 
       setData({
         owner: lowerOwner,
@@ -127,7 +179,7 @@ export default function LaunchpadClient() {
         myBnb,
         myUsdt,
       });
-      setIsOwner(!!lowerAcc && lowerAcc === lowerOwner);
+      setIsOwner(!!account && lowerAcc === lowerOwner);
     } catch (e) {
       console.error('Launchpad read error:', e);
     }
@@ -141,9 +193,10 @@ export default function LaunchpadClient() {
   // helper с signer
   // =========================
   async function withSigner<T>(cb: (c: Contract) => Promise<T>): Promise<T> {
-    if (!signer) {
+    if (!provider) {
       throw new Error('Wallet not connected');
     }
+    const signer = await provider.getSigner();
     const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, signer);
     return cb(c);
   }
@@ -152,7 +205,7 @@ export default function LaunchpadClient() {
   // Actions
   // =========================
   async function buyBNB() {
-    if (!account) {
+    if (!provider || !account) {
       alert('Connect wallet first');
       return;
     }
@@ -175,14 +228,14 @@ export default function LaunchpadClient() {
   }
 
   async function buyUSDT() {
-    if (!signer || !account) {
+    if (!provider || !account) {
       alert('Connect wallet first');
       return;
     }
 
     try {
       setLoading(true);
-
+      const signer = await provider.getSigner();
       const usdt = new Contract(USDT_ADDRESS, erc20Abi, signer);
       const amt = BigInt(Math.round(Number(amountUsdt) * 1e6)); // USDT 6 decimals
 
@@ -207,7 +260,7 @@ export default function LaunchpadClient() {
   }
 
   async function claim() {
-    if (!account) {
+    if (!provider || !account) {
       alert('Connect wallet first');
       return;
     }
@@ -231,6 +284,11 @@ export default function LaunchpadClient() {
 
   // Owner only
   async function setStartRates() {
+    if (!provider || !account) {
+      alert('Connect wallet first');
+      return;
+    }
+
     try {
       setLoading(true);
       const bnbUsd = 933660000n; // $933.66 * 1e6
@@ -294,6 +352,8 @@ export default function LaunchpadClient() {
 
   const d = data;
 
+  const isWalletConnected = !!account && !!provider;
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 text-gray-200">
       <div className="rounded-2xl bg-[#0F1115] border border-[#23262B] p-6 shadow-xl">
@@ -304,14 +364,41 @@ export default function LaunchpadClient() {
             <span className="text-xs opacity-60 break-all">
               Contract: {LAUNCHPAD_ADDRESS}
             </span>
+            {chainId && (
+              <div className="text-[11px] opacity-60 mt-1">
+                Connected chain: {chainId}
+              </div>
+            )}
           </div>
 
-          {/* используем общий, уже рабочий WalletConnectButton */}
           <div className="flex flex-col items-end gap-1">
             {account && (
-              <div className="text-xs opacity-70 break-all">{account}</div>
+              <div className="text-xs opacity-70 break-all">
+                {account}
+              </div>
             )}
-            <WalletConnectButton />
+            {isWalletConnected ? (
+              <button
+                onClick={disconnectWallet}
+                disabled={isConnecting}
+                className="px-4 py-2 rounded-xl bg-[#f97373] text-black font-semibold hover:bg-[#fb5c5c] transition disabled:opacity-40 text-sm"
+              >
+                Disconnect
+              </button>
+            ) : (
+              <button
+                onClick={connectWallet}
+                disabled={isConnecting}
+                className="px-4 py-2 rounded-xl bg-[#22c55e] text-black font-semibold hover:bg-[#4ade80] transition disabled:opacity-40 text-sm"
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+              </button>
+            )}
+            {walletErr && (
+              <div className="text-[11px] text-red-400 max-w-xs text-right">
+                {walletErr}
+              </div>
+            )}
           </div>
         </div>
 
@@ -388,7 +475,7 @@ export default function LaunchpadClient() {
               />
               <button
                 onClick={buyBNB}
-                disabled={loading || !account}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
               >
                 Contribute
@@ -411,7 +498,7 @@ export default function LaunchpadClient() {
               />
               <button
                 onClick={buyUSDT}
-                disabled={loading || !account}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
               >
                 Contribute
@@ -429,7 +516,7 @@ export default function LaunchpadClient() {
           <h3 className="font-medium mb-3">Claim</h3>
           <button
             onClick={claim}
-            disabled={loading || !account}
+            disabled={loading || !isWalletConnected}
             className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40"
           >
             Claim vested GAD
@@ -443,28 +530,28 @@ export default function LaunchpadClient() {
             <div className="flex gap-3 flex-wrap">
               <button
                 onClick={setStartRates}
-                disabled={loading}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40"
               >
                 Set Start Rates
               </button>
               <button
                 onClick={pause}
-                disabled={loading}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40"
               >
                 Pause
               </button>
               <button
                 onClick={unpause}
-                disabled={loading}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40"
               >
                 Unpause
               </button>
               <button
                 onClick={finalize}
-                disabled={loading}
+                disabled={loading || !isWalletConnected}
                 className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40"
               >
                 Finalize
@@ -479,7 +566,7 @@ export default function LaunchpadClient() {
         <div className="mt-8 text-xs opacity-60 space-y-1 break-all">
           <div>Owner: {d?.owner ?? '-'}</div>
           <div>Pending owner: {d?.pendingOwner ?? '-'}</div>
-          {!account && (
+          {!isWalletConnected && (
             <div className="text-amber-400">
               Connect your wallet above to participate in the launchpad.
             </div>
