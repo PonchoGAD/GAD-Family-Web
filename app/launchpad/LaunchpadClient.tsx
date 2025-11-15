@@ -1,257 +1,384 @@
 'use client';
+
 import React from 'react';
 import {
   BrowserProvider,
+  JsonRpcProvider,
   Contract,
-  Eip1193Provider,
-  formatEther,
-  InterfaceAbi,
   parseEther,
+  formatEther,
 } from 'ethers';
 import { launchpadAbi } from '../abis/LaunchpadSaleV3';
 import { erc20Abi } from '../abis/ERC20';
 import { CHAIN_ID, LAUNCHPAD_ADDRESS, USDT_ADDRESS } from '../config/launchpad';
+import { useWallet } from '../nft/hooks/useWallet';
 
-// ---- Types ----
-type RequestArgs = { method: string; params?: unknown[] };
-type EthereumLike = Eip1193Provider & { request: (args: RequestArgs) => Promise<unknown> };
-
-interface LaunchpadData {
+type LaunchpadState = {
   owner: string;
   pendingOwner: string;
   startTime: bigint;
   endTime: bigint;
-
   hardCapUsd: bigint;
   minBnbWei: bigint;
   maxBnbWei: bigint;
   minUsdt: bigint;
   maxUsdt: bigint;
-
   tgeBps: bigint;
   sliceSeconds: bigint;
   slicesCount: bigint;
   liquidityBps: bigint;
-
   ratesSet: boolean;
   isFinalized: boolean;
   paused: boolean;
-
   myBnb: bigint;
   myUsdt: bigint;
-}
-
-const EMPTY_DATA: LaunchpadData = {
-  owner: '',
-  pendingOwner: '0x0000000000000000000000000000000000000000',
-  startTime: 0n,
-  endTime: 0n,
-
-  hardCapUsd: 0n,
-  minBnbWei: 0n,
-  maxBnbWei: 0n,
-  minUsdt: 0n,
-  maxUsdt: 0n,
-
-  tgeBps: 0n,
-  sliceSeconds: 0n,
-  slicesCount: 0n,
-  liquidityBps: 0n,
-
-  ratesSet: false,
-  isFinalized: false,
-  paused: false,
-
-  myBnb: 0n,
-  myUsdt: 0n,
 };
 
-// ---- Hooks ----
-function useProvider() {
-  const [provider, setProvider] = React.useState<BrowserProvider | null>(null);
-  const [account, setAccount] = React.useState<string>('');
+const ZERO: bigint = 0n;
 
-  React.useEffect(() => {
-    const w = window as unknown as { ethereum?: EthereumLike };
-    if (!w.ethereum) return;
+// RPC-провайдер только для чтения
+const RPC_URL =
+  process.env.NEXT_PUBLIC_BSC_RPC ??
+  'https://bsc-dataseed.binance.org';
 
-    const p = new BrowserProvider(w.ethereum);
-    setProvider(p);
+const readProvider = new JsonRpcProvider(RPC_URL);
 
-    (async () => {
-      const accs = (await w.ethereum.request({ method: 'eth_requestAccounts' })) as string[] | undefined;
-      setAccount((accs?.[0] ?? '').toLowerCase());
-
-      const net = await p.getNetwork();
-      if (Number(net.chainId) !== CHAIN_ID) {
-        try {
-          await w.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x38' }], // 56
-          });
-        } catch {
-          /* ignore */
-        }
-      }
-    })();
-  }, []);
-
-  return { provider, account };
-}
-
-// ---- Utils ----
 function toDate(ts?: bigint) {
   if (!ts || ts === 0n) return '-';
   const d = new Date(Number(ts) * 1000);
   return d.toUTCString().replace('GMT', 'UTC');
 }
 
-// ---- Component ----
 export default function LaunchpadClient() {
-  const { provider, account } = useProvider();
-  const [data, setData] = React.useState<LaunchpadData>(EMPTY_DATA);
+  // useWallet из NFT-модуля
+  const { provider, account } = useWallet();
+
+  const [data, setData] = React.useState<LaunchpadState | null>(null);
   const [isOwner, setIsOwner] = React.useState(false);
   const [amountBnb, setAmountBnb] = React.useState('0.1');
-  const [amountUsdt, setAmountUsdt] = React.useState('100');
+  const [amountUsdt, setAmountUsdt] = React.useState('10');
+  const [loading, setLoading] = React.useState(false);
 
-  const lp = React.useMemo(() => {
-    if (!provider) return null;
-    return new Contract(LAUNCHPAD_ADDRESS, launchpadAbi as InterfaceAbi, provider);
-  }, [provider]);
+  // контракт только для чтения
+  const lpRead = React.useMemo(() => {
+    return new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, readProvider);
+  }, []);
 
-  React.useEffect(() => {
-    (async () => {
-      if (!lp) return;
-
+  // =========================
+  // Загрузка данных
+  // =========================
+  const refresh = React.useCallback(async () => {
+    try {
       const [
-        owner, pendingOwner, startTime, endTime,
-        hardCapUsd, minBnbWei, maxBnbWei, minUsdt, maxUsdt,
-        tgeBps, sliceSeconds, slicesCount, liquidityBps,
-        ratesSet, isFinalized, paused,
-        myBnb, myUsdt,
+        owner,
+        pendingOwner,
+        startTime,
+        endTime,
+        hardCapUsd,
+        minBnbWei,
+        maxBnbWei,
+        minUsdt,
+        maxUsdt,
+        tgeBps,
+        sliceSeconds,
+        slicesCount,
+        liquidityBps,
+        ratesSet,
+        isFinalized,
+        paused,
+        myBnb,
+        myUsdt,
       ] = await Promise.all([
-        lp.owner() as Promise<string>,
-        lp.pendingOwner() as Promise<string>,
-        lp.startTime() as Promise<bigint>,
-        lp.endTime() as Promise<bigint>,
-        lp.hardCapUsd() as Promise<bigint>,
-        lp.minBnbWei() as Promise<bigint>,
-        lp.maxBnbWei() as Promise<bigint>,
-        lp.minUsdt() as Promise<bigint>,
-        lp.maxUsdt() as Promise<bigint>,
-        lp.tgeBps() as Promise<bigint>,
-        lp.sliceSeconds() as Promise<bigint>,
-        lp.slicesCount() as Promise<bigint>,
-        lp.liquidityBps() as Promise<bigint>,
-        lp.ratesSet() as Promise<boolean>,
-        lp.isFinalized() as Promise<boolean>,
-        lp.paused() as Promise<boolean>,
-        account ? (lp.contributedBnbWei(account) as Promise<bigint>) : Promise.resolve(0n),
-        account ? (lp.contributedUsdt(account) as Promise<bigint>) : Promise.resolve(0n),
+        lpRead.owner(),
+        lpRead.pendingOwner(),
+        lpRead.startTime(),
+        lpRead.endTime(),
+        lpRead.hardCapUsd(),
+        lpRead.minBnbWei(),
+        lpRead.maxBnbWei(),
+        lpRead.minUsdt(),
+        lpRead.maxUsdt(),
+        lpRead.tgeBps(),
+        lpRead.sliceSeconds(),
+        lpRead.slicesCount(),
+        lpRead.liquidityBps(),
+        lpRead.ratesSet(),
+        lpRead.isFinalized(),
+        lpRead.paused(),
+        account ? lpRead.contributedBnbWei(account) : Promise.resolve(ZERO),
+        account ? lpRead.contributedUsdt(account) : Promise.resolve(ZERO),
       ]);
 
+      const lowerOwner = String(owner).toLowerCase();
+      const lowerAcc = (account ?? '').toLowerCase();
+
       setData({
-        owner: String(owner).toLowerCase(),
+        owner: lowerOwner,
         pendingOwner,
-        startTime, endTime,
-        hardCapUsd, minBnbWei, maxBnbWei, minUsdt, maxUsdt,
-        tgeBps, sliceSeconds, slicesCount, liquidityBps,
-        ratesSet, isFinalized, paused,
-        myBnb, myUsdt,
+        startTime,
+        endTime,
+        hardCapUsd,
+        minBnbWei,
+        maxBnbWei,
+        minUsdt,
+        maxUsdt,
+        tgeBps,
+        sliceSeconds,
+        slicesCount,
+        liquidityBps,
+        ratesSet,
+        isFinalized,
+        paused,
+        myBnb,
+        myUsdt,
       });
+      setIsOwner(!!lowerAcc && lowerAcc === lowerOwner);
+    } catch (e) {
+      console.error('Launchpad read error:', e);
+    }
+  }, [lpRead, account]);
 
-      setIsOwner(
-        Boolean(account) &&
-          String(owner).toLowerCase() === String(account).toLowerCase(),
-      );
-    })();
-  }, [lp, account]);
+  React.useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
-  async function withSigner<T>(cb: (c: Contract) => Promise<T>): Promise<T> {
-    if (!provider) throw new Error('Wallet not connected');
-    const signer = await provider.getSigner();
-    const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi as InterfaceAbi, signer);
-    return cb(c);
+  // =========================
+  // Вспомогательная функция с signer
+  // =========================
+  async function withSigner<T>(
+    cb: (c: Contract, signerAddress: string) => Promise<T>,
+  ): Promise<T> {
+    if (!provider) {
+      throw new Error('Wallet not connected');
+    }
+
+    // приведение к BrowserProvider, чтобы TS не ругался
+    const p = provider as unknown as BrowserProvider;
+
+    const net = await p.getNetwork();
+    if (Number(net.chainId) !== CHAIN_ID) {
+      throw new Error('Wrong network. Switch to BNB Chain.');
+    }
+
+    const signer = await p.getSigner();
+    const signerAddress = await signer.getAddress();
+    const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, signer);
+    return cb(c, signerAddress);
   }
 
+  // =========================
+  // Actions
+  // =========================
   async function buyBNB() {
-    await withSigner(async (c) => {
-      const tx = await c.buyWithBNB({ value: parseEther(amountBnb) });
-      await tx.wait();
+    try {
+      setLoading(true);
+      await withSigner(async (c) => {
+        const tx = await c.buyWithBNB({ value: parseEther(amountBnb) });
+        await tx.wait();
+        return;
+      });
+      await refresh();
       alert('BNB contribution sent');
-    });
+    } catch (e) {
+      console.error(e);
+      alert('BNB contribution failed. Check console/logs.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function buyUSDT() {
-    if (!provider) return;
-    const signer = await provider.getSigner();
-    const usdt = new Contract(USDT_ADDRESS, erc20Abi as InterfaceAbi, signer);
-    const amt = BigInt(Math.round(Number(amountUsdt) * 1e6)); // USDT 6 decimals
-
-    const ownerAddr = await signer.getAddress();
-    const allowance = (await usdt.allowance(ownerAddr, LAUNCHPAD_ADDRESS)) as bigint;
-    if (allowance < amt) {
-      const tx1 = await usdt.approve(LAUNCHPAD_ADDRESS, amt);
-      await tx1.wait();
+    if (!provider) {
+      alert('Connect wallet first');
+      return;
     }
-    const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi as InterfaceAbi, signer);
-    const tx2 = await c.buyWithUSDT(amt);
-    await tx2.wait();
-    alert('USDT contribution sent');
+
+    try {
+      setLoading(true);
+
+      const p = provider as unknown as BrowserProvider;
+      const signer = await p.getSigner();
+      const ownerAddr = await signer.getAddress();
+      const usdt = new Contract(USDT_ADDRESS, erc20Abi, signer);
+      const amt = BigInt(Math.round(Number(amountUsdt) * 1e6)); // USDT 6 decimals
+
+      const allowance: bigint = await usdt.allowance(
+        ownerAddr,
+        LAUNCHPAD_ADDRESS,
+      );
+      if (allowance < amt) {
+        const tx1 = await usdt.approve(LAUNCHPAD_ADDRESS, amt);
+        await tx1.wait();
+      }
+
+      const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, signer);
+      const tx2 = await c.buyWithUSDT(amt);
+      await tx2.wait();
+
+      await refresh();
+      alert('USDT contribution sent');
+    } catch (e) {
+      console.error(e);
+      alert('USDT contribution failed. Check console/logs.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function claim() {
-    await withSigner(async (c) => {
-      const tx = await c.claim();
-      await tx.wait();
+    try {
+      setLoading(true);
+      await withSigner(async (c) => {
+        const tx = await c.claim();
+        await tx.wait();
+        return;
+      });
+      await refresh();
       alert('Claimed');
-    });
+    } catch (e) {
+      console.error(e);
+      alert('Claim failed. Check console/logs.');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // owner only (hidden for others)
+  // Owner only
   async function setStartRates() {
-    // placeholder values — не ставим реальные цены
-    const bnbUsd = 0n;    // 1e6
-    const gadPerUsd = 0n; // 1e6
-    await withSigner(async (c) => {
-      const tx = await c.setStartRates(bnbUsd, gadPerUsd);
-      await tx.wait();
+    try {
+      setLoading(true);
+      const bnbUsd = 933660000n; // $933.66 * 1e6
+      const gadPerUsd = 100000000n; // 100 000 GAD * 1e3 (по нашей договорённости)
+      await withSigner(async (c) => {
+        const tx = await c.setStartRates(bnbUsd, gadPerUsd);
+        await tx.wait();
+        return;
+      });
+      await refresh();
       alert('Rates set');
-    });
+    } catch (e) {
+      console.error(e);
+      alert('setStartRates failed. Check console/logs.');
+    } finally {
+      setLoading(false);
+    }
   }
-  async function pause()    { await withSigner(async (c) => (await c.pause()).wait()); }
-  async function unpause()  { await withSigner(async (c) => (await c.unpause()).wait()); }
-  async function finalize() { await withSigner(async (c) => (await c.finalize()).wait()); }
+
+  async function pause() {
+    try {
+      setLoading(true);
+      await withSigner(async (c) => {
+        const tx = await c.pause();
+        await tx.wait();
+        return;
+      });
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function unpause() {
+    try {
+      setLoading(true);
+      await withSigner(async (c) => {
+        const tx = await c.unpause();
+        await tx.wait();
+        return;
+      });
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function finalize() {
+    try {
+      setLoading(true);
+      await withSigner(async (c) => {
+        const tx = await c.finalize();
+        await tx.wait();
+        return;
+      });
+      await refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const d = data;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 text-gray-200">
       <div className="rounded-2xl bg-[#0F1115] border border-[#23262B] p-6 shadow-xl">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold">GAD Launchpad</h1>
-          <span className="text-xs opacity-60">Contract: {LAUNCHPAD_ADDRESS}</span>
+          <span className="text-xs opacity-60 break-all">
+            Contract: {LAUNCHPAD_ADDRESS}
+          </span>
         </div>
 
+        {/* INFO CARDS */}
         <div className="grid md:grid-cols-3 gap-6 mt-6">
-          <Card title="Timeline" items={[
-            ['Start', toDate(data.startTime)],
-            ['End', toDate(data.endTime)],
-            ['Paused', String(data.paused)],
-          ]}/>
-          <Card title="Caps & Limits" items={[
-            ['Hard Cap (USD, 1e6)', String(data.hardCapUsd ?? '-')],
-            ['Min BNB', data.minBnbWei ? `${formatEther(data.minBnbWei)} BNB` : '-'],
-            ['Max BNB', data.maxBnbWei ? `${formatEther(data.maxBnbWei)} BNB` : '-'],
-            ['Min USDT', data.minUsdt ? `${Number(data.minUsdt)/1e6} USDT` : '-'],
-            ['Max USDT', data.maxUsdt ? `${Number(data.maxUsdt)/1e6} USDT` : '-'],
-          ]}/>
-          <Card title="Vesting" items={[
-            ['TGE', data.tgeBps ? `${Number(data.tgeBps)/100}%` : '-'],
-            ['Slice', data.sliceSeconds ? `${Number(data.sliceSeconds)/86400} days` : '-'],
-            ['Count', String(data.slicesCount ?? '-')],
-            ['Liquidity', data.liquidityBps ? `${Number(data.liquidityBps)/100}%` : '-'],
-          ]}/>
+          <Card
+            title="Timeline"
+            items={[
+              ['Start', d ? toDate(d.startTime) : '-'],
+              ['End', d ? toDate(d.endTime) : '-'],
+              ['Paused', d ? String(d.paused) : '-'],
+            ]}
+          />
+          <Card
+            title="Caps & Limits"
+            items={[
+              ['Hard Cap (USD, 1e6)', d ? String(d.hardCapUsd) : '-'],
+              [
+                'Min BNB',
+                d && d.minBnbWei !== ZERO
+                  ? `${formatEther(d.minBnbWei)} BNB`
+                  : '-',
+              ],
+              [
+                'Max BNB',
+                d && d.maxBnbWei !== ZERO
+                  ? `${formatEther(d.maxBnbWei)} BNB`
+                  : '-',
+              ],
+              [
+                'Min USDT',
+                d && d.minUsdt !== ZERO ? `${Number(d.minUsdt) / 1e6} USDT` : '-',
+              ],
+              [
+                'Max USDT',
+                d && d.maxUsdt !== ZERO ? `${Number(d.maxUsdt) / 1e6} USDT` : '-',
+              ],
+            ]}
+          />
+          <Card
+            title="Vesting"
+            items={[
+              [
+                'TGE',
+                d && d.tgeBps !== ZERO ? `${Number(d.tgeBps) / 100}%` : '-',
+              ],
+              [
+                'Slice',
+                d && d.sliceSeconds !== ZERO
+                  ? `${Number(d.sliceSeconds) / 86400} days`
+                  : '-',
+              ],
+              ['Count', d ? String(d.slicesCount) : '-'],
+              [
+                'Liquidity',
+                d && d.liquidityBps !== ZERO
+                  ? `${Number(d.liquidityBps) / 100}%`
+                  : '-',
+              ],
+            ]}
+          />
         </div>
 
+        {/* CONTRIBUTIONS */}
         <div className="grid md:grid-cols-2 gap-6 mt-8">
           <div className="rounded-xl bg-[#12151B] border border-[#2A2F36] p-5">
             <h3 className="font-medium mb-3">Contribute with BNB</h3>
@@ -262,12 +389,17 @@ export default function LaunchpadClient() {
                 className="flex-1 bg-[#0E1116] border border-[#2A2F36] rounded-lg px-3 py-2 outline-none"
                 placeholder="0.1"
               />
-              <button onClick={buyBNB} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+              <button
+                onClick={buyBNB}
+                disabled={loading || !account}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+              >
                 Contribute
               </button>
             </div>
             <p className="mt-3 text-sm opacity-70">
-              Your BNB: {data.myBnb ? `${formatEther(data.myBnb)} BNB` : '0'}
+              Your BNB:{' '}
+              {d && d.myBnb !== ZERO ? `${formatEther(d.myBnb)} BNB` : '0'}
             </p>
           </div>
 
@@ -278,52 +410,91 @@ export default function LaunchpadClient() {
                 value={amountUsdt}
                 onChange={(e) => setAmountUsdt(e.target.value)}
                 className="flex-1 bg-[#0E1116] border border-[#2A2F36] rounded-lg px-3 py-2 outline-none"
-                placeholder="100"
+                placeholder="10"
               />
-              <button onClick={buyUSDT} className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">
+              <button
+                onClick={buyUSDT}
+                disabled={loading || !account}
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40"
+              >
                 Contribute
               </button>
             </div>
             <p className="mt-3 text-sm opacity-70">
-              Your USDT: {data.myUsdt ? `${Number(data.myUsdt)/1e6} USDT` : '0'}
+              Your USDT:{' '}
+              {d && d.myUsdt !== ZERO ? `${Number(d.myUsdt) / 1e6} USDT` : '0'}
             </p>
           </div>
         </div>
 
+        {/* CLAIM */}
         <div className="mt-8 rounded-xl bg-[#12151B] border border-[#2A2F36] p-5">
           <h3 className="font-medium mb-3">Claim</h3>
-          <button onClick={claim} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500">
+          <button
+            onClick={claim}
+            disabled={loading || !account}
+            className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40"
+          >
             Claim vested GAD
           </button>
         </div>
 
+        {/* OWNER CONTROLS */}
         {isOwner && (
           <div className="mt-8 rounded-xl bg-[#191E26] border border-[#2F3842] p-5">
             <h3 className="font-medium mb-4">Owner Controls</h3>
             <div className="flex gap-3 flex-wrap">
-              <button onClick={setStartRates} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500">
-                Set Start Rates (dry)
+              <button
+                onClick={setStartRates}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-40"
+              >
+                Set Start Rates
               </button>
-              <button onClick={pause} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Pause</button>
-              <button onClick={unpause} className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600">Unpause</button>
-              <button onClick={finalize} className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500">Finalize</button>
+              <button
+                onClick={pause}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40"
+              >
+                Pause
+              </button>
+              <button
+                onClick={unpause}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40"
+              >
+                Unpause
+              </button>
+              <button
+                onClick={finalize}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-40"
+              >
+                Finalize
+              </button>
             </div>
             <p className="text-xs opacity-60 mt-2">
-              Visible only for the owner address. Rates function is a placeholder (0/0) to prevent accidental launch.
+              Owner actions available only for the Safe owner address.
             </p>
           </div>
         )}
 
-        <div className="mt-8 text-xs opacity-60">
-          <div>Owner: {data.owner}</div>
-          <div>Pending owner: {data.pendingOwner}</div>
+        <div className="mt-8 text-xs opacity-60 space-y-1 break-all">
+          <div>Owner: {d?.owner ?? '-'}</div>
+          <div>Pending owner: {d?.pendingOwner ?? '-'}</div>
+          {!account && (
+            <div className="text-amber-400">
+              Connect your wallet in the header to participate in the launchpad.
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function Card({ title, items }: { title: string; items: [string, string][] }) {
+function Card(props: { title: string; items: [string, string][] }) {
+  const { title, items } = props;
   return (
     <div className="rounded-xl bg-[#12151B] border border-[#2A2F36] p-5">
       <h3 className="font-medium mb-3">{title}</h3>
@@ -331,7 +502,7 @@ function Card({ title, items }: { title: string; items: [string, string][] }) {
         {items.map(([k, v]) => (
           <li key={k} className="flex justify-between gap-3">
             <span className="opacity-60">{k}</span>
-            <span className="font-mono">{v}</span>
+            <span className="font-mono text-right">{v}</span>
           </li>
         ))}
       </ul>
