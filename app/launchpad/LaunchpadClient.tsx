@@ -6,6 +6,7 @@ import { launchpadAbi } from '../abis/LaunchpadSaleV3';
 import { erc20Abi } from '../abis/ERC20';
 import { LAUNCHPAD_ADDRESS, USDT_ADDRESS } from '../config/launchpad';
 import { useWallet } from '../nft/hooks/useWallet';
+import WalletConnectButton from '../components/WalletConnectButton';
 
 type LaunchpadState = {
   owner: string;
@@ -44,8 +45,7 @@ function toDate(ts?: bigint) {
 
 export default function LaunchpadClient() {
   // общий хук кошелька из NFT-модуля
-  const { signer, account, connect, disconnect, isConnected, isConnecting } =
-    useWallet();
+  const { signer, account } = useWallet();
 
   const [data, setData] = React.useState<LaunchpadState | null>(null);
   const [isOwner, setIsOwner] = React.useState(false);
@@ -306,27 +306,12 @@ export default function LaunchpadClient() {
             </span>
           </div>
 
+          {/* используем общий, уже рабочий WalletConnectButton */}
           <div className="flex flex-col items-end gap-1">
             {account && (
               <div className="text-xs opacity-70 break-all">{account}</div>
             )}
-            {isConnected ? (
-              <button
-                onClick={() => disconnect()}
-                disabled={isConnecting}
-                className="px-4 py-2 rounded-xl bg-[#f97373] text-black font-semibold hover:bg-[#fb5c5c] transition disabled:opacity-40 text-sm"
-              >
-                Disconnect
-              </button>
-            ) : (
-              <button
-                onClick={() => connect()}
-                disabled={isConnecting}
-                className="px-4 py-2 rounded-xl bg-[#22c55e] text-black font-semibold hover:bg-[#4ade80] transition disabled:opacity-40 text-sm"
-              >
-                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-              </button>
-            )}
+            <WalletConnectButton />
           </div>
         </div>
 
