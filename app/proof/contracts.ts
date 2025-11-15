@@ -123,8 +123,8 @@ export const CONTRACTS: ContractItem[] = [
     note: "Supports linear and milestone-based schedules."
   },
   {
-    name: "LaunchpadSaleV3",
-    address: "0x528e90A8304dCd05B351F1291eA34d7d74E4A08d",
+    name: "LaunchpadSale",
+    address: "0x6501FCD154B9276b0821c0127B43e8A4412566Df",
     purpose: "Launchpad contract for public sales and allocations.",
     bscscanPath: "address",
     status: "Live",
