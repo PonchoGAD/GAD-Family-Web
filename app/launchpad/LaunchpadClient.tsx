@@ -1,16 +1,10 @@
 'use client';
 
 import React from 'react';
-import {
-  BrowserProvider,
-  JsonRpcProvider,
-  Contract,
-  parseEther,
-  formatEther,
-} from 'ethers';
+import { JsonRpcProvider, Contract, parseEther, formatEther } from 'ethers';
 import { launchpadAbi } from '../abis/LaunchpadSaleV3';
 import { erc20Abi } from '../abis/ERC20';
-import { CHAIN_ID, LAUNCHPAD_ADDRESS, USDT_ADDRESS } from '../config/launchpad';
+import { LAUNCHPAD_ADDRESS, USDT_ADDRESS } from '../config/launchpad';
 import { useWallet } from '../nft/hooks/useWallet';
 
 type LaunchpadState = {
@@ -36,10 +30,9 @@ type LaunchpadState = {
 
 const ZERO: bigint = 0n;
 
-// RPC-провайдер только для чтения
+// read-only RPC provider
 const RPC_URL =
-  process.env.NEXT_PUBLIC_BSC_RPC ??
-  'https://bsc-dataseed.binance.org';
+  process.env.NEXT_PUBLIC_BSC_RPC ?? 'https://bsc-dataseed.binance.org';
 
 const readProvider = new JsonRpcProvider(RPC_URL);
 
@@ -50,8 +43,8 @@ function toDate(ts?: bigint) {
 }
 
 export default function LaunchpadClient() {
-  // useWallet из NFT-модуля
-  const { provider, account } = useWallet();
+  // общий хук кошелька из NFT-модуля
+  const { signer, account } = useWallet();
 
   const [data, setData] = React.useState<LaunchpadState | null>(null);
   const [isOwner, setIsOwner] = React.useState(false);
@@ -60,9 +53,10 @@ export default function LaunchpadClient() {
   const [loading, setLoading] = React.useState(false);
 
   // контракт только для чтения
-  const lpRead = React.useMemo(() => {
-    return new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, readProvider);
-  }, []);
+  const lpRead = React.useMemo(
+    () => new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, readProvider),
+    [],
+  );
 
   // =========================
   // Загрузка данных
@@ -143,33 +137,25 @@ export default function LaunchpadClient() {
   }, [refresh]);
 
   // =========================
-  // Вспомогательная функция с signer
+  // helper с signer
   // =========================
-  async function withSigner<T>(
-    cb: (c: Contract, signerAddress: string) => Promise<T>,
-  ): Promise<T> {
-    if (!provider) {
+  async function withSigner<T>(cb: (c: Contract) => Promise<T>): Promise<T> {
+    if (!signer) {
       throw new Error('Wallet not connected');
     }
-
-    // приведение к BrowserProvider, чтобы TS не ругался
-    const p = provider as unknown as BrowserProvider;
-
-    const net = await p.getNetwork();
-    if (Number(net.chainId) !== CHAIN_ID) {
-      throw new Error('Wrong network. Switch to BNB Chain.');
-    }
-
-    const signer = await p.getSigner();
-    const signerAddress = await signer.getAddress();
     const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, signer);
-    return cb(c, signerAddress);
+    return cb(c);
   }
 
   // =========================
   // Actions
   // =========================
   async function buyBNB() {
+    if (!account) {
+      alert('Connect wallet first');
+      return;
+    }
+
     try {
       setLoading(true);
       await withSigner(async (c) => {
@@ -188,7 +174,7 @@ export default function LaunchpadClient() {
   }
 
   async function buyUSDT() {
-    if (!provider) {
+    if (!signer || !account) {
       alert('Connect wallet first');
       return;
     }
@@ -196,16 +182,10 @@ export default function LaunchpadClient() {
     try {
       setLoading(true);
 
-      const p = provider as unknown as BrowserProvider;
-      const signer = await p.getSigner();
-      const ownerAddr = await signer.getAddress();
       const usdt = new Contract(USDT_ADDRESS, erc20Abi, signer);
       const amt = BigInt(Math.round(Number(amountUsdt) * 1e6)); // USDT 6 decimals
 
-      const allowance: bigint = await usdt.allowance(
-        ownerAddr,
-        LAUNCHPAD_ADDRESS,
-      );
+      const allowance: bigint = await usdt.allowance(account, LAUNCHPAD_ADDRESS);
       if (allowance < amt) {
         const tx1 = await usdt.approve(LAUNCHPAD_ADDRESS, amt);
         await tx1.wait();
@@ -226,6 +206,11 @@ export default function LaunchpadClient() {
   }
 
   async function claim() {
+    if (!account) {
+      alert('Connect wallet first');
+      return;
+    }
+
     try {
       setLoading(true);
       await withSigner(async (c) => {
@@ -248,7 +233,7 @@ export default function LaunchpadClient() {
     try {
       setLoading(true);
       const bnbUsd = 933660000n; // $933.66 * 1e6
-      const gadPerUsd = 100000000n; // 100 000 GAD * 1e3 (по нашей договорённости)
+      const gadPerUsd = 100000000n; // 100 000 GAD (как договаривались)
       await withSigner(async (c) => {
         const tx = await c.setStartRates(bnbUsd, gadPerUsd);
         await tx.wait();
