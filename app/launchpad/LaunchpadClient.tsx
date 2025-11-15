@@ -50,11 +50,32 @@ function toDate(ts?: bigint) {
 
 type EthereumLike = { ethereum?: Eip1193Provider };
 
-// аккуратно достаём window.ethereum без any
 function getEth(): Eip1193Provider | null {
   if (typeof window === 'undefined') return null;
   const w = window as unknown as EthereumLike;
   return w.ethereum ?? null;
+}
+
+// Нормальный разбор ошибки без any
+function getErrorMessage(error: unknown): string {
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const e = error as {
+      message?: string;
+      reason?: string;
+      shortMessage?: string;
+      error?: { message?: string; reason?: string };
+      data?: { message?: string };
+    };
+
+    if (e.reason) return e.reason;
+    if (e.shortMessage) return e.shortMessage;
+    if (e.error?.reason) return e.error.reason;
+    if (e.error?.message) return e.error.message;
+    if (e.data?.message) return e.data.message;
+    if (e.message) return e.message;
+  }
+  return 'Transaction failed';
 }
 
 export default function LaunchpadClient() {
@@ -71,13 +92,10 @@ export default function LaunchpadClient() {
   const [amountUsdt, setAmountUsdt] = React.useState('10');
   const [loading, setLoading] = React.useState(false);
 
-  // контракт только для чтения
   const lpRead = React.useMemo(
     () => new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, readProvider),
     [],
   );
-
-  // ====== Подключение / отключение кошелька ======
 
   const connectWallet = React.useCallback(async () => {
     setWalletErr('');
@@ -96,9 +114,9 @@ export default function LaunchpadClient() {
       const addr = await signer.getAddress();
       setAccount(addr);
       setProvider(prov);
-    } catch (e) {
-      const errObj = e as { message?: string };
-      setWalletErr(errObj?.message ?? 'Wallet connect failed');
+    } catch (error) {
+      const msg = getErrorMessage(error);
+      setWalletErr(msg);
     } finally {
       setIsConnecting(false);
     }
@@ -180,8 +198,8 @@ export default function LaunchpadClient() {
         myUsdt,
       });
       setIsOwner(!!account && lowerAcc === lowerOwner);
-    } catch (e) {
-      console.error('Launchpad read error:', e);
+    } catch (error) {
+      console.error('Launchpad read error:', error);
     }
   }, [lpRead, account]);
 
@@ -219,9 +237,9 @@ export default function LaunchpadClient() {
       });
       await refresh();
       alert('BNB contribution sent');
-    } catch (e) {
-      console.error(e);
-      alert('BNB contribution failed. Check console/logs.');
+    } catch (error) {
+      console.error('BNB contribution error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -251,9 +269,9 @@ export default function LaunchpadClient() {
 
       await refresh();
       alert('USDT contribution sent');
-    } catch (e) {
-      console.error(e);
-      alert('USDT contribution failed. Check console/logs.');
+    } catch (error) {
+      console.error('USDT contribution error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -274,9 +292,9 @@ export default function LaunchpadClient() {
       });
       await refresh();
       alert('Claimed');
-    } catch (e) {
-      console.error(e);
-      alert('Claim failed. Check console/logs.');
+    } catch (error) {
+      console.error('Claim error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -292,7 +310,7 @@ export default function LaunchpadClient() {
     try {
       setLoading(true);
       const bnbUsd = 933660000n; // $933.66 * 1e6
-      const gadPerUsd = 100000000n; // 100 000 GAD (как договаривались)
+      const gadPerUsd = 100000000n; // 100 000 GAD
       await withSigner(async (c) => {
         const tx = await c.setStartRates(bnbUsd, gadPerUsd);
         await tx.wait();
@@ -300,9 +318,9 @@ export default function LaunchpadClient() {
       });
       await refresh();
       alert('Rates set');
-    } catch (e) {
-      console.error(e);
-      alert('setStartRates failed. Check console/logs.');
+    } catch (error) {
+      console.error('setStartRates error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -317,6 +335,9 @@ export default function LaunchpadClient() {
         return;
       });
       await refresh();
+    } catch (error) {
+      console.error('pause error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -331,6 +352,9 @@ export default function LaunchpadClient() {
         return;
       });
       await refresh();
+    } catch (error) {
+      console.error('unpause error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -345,13 +369,15 @@ export default function LaunchpadClient() {
         return;
       });
       await refresh();
+    } catch (error) {
+      console.error('finalize error:', error);
+      alert(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
   }
 
   const d = data;
-
   const isWalletConnected = !!account && !!provider;
 
   return (
@@ -373,9 +399,7 @@ export default function LaunchpadClient() {
 
           <div className="flex flex-col items-end gap-1">
             {account && (
-              <div className="text-xs opacity-70 break-all">
-                {account}
-              </div>
+              <div className="text-xs opacity-70 break-all">{account}</div>
             )}
             {isWalletConnected ? (
               <button
