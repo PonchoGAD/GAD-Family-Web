@@ -44,7 +44,8 @@ function toDate(ts?: bigint) {
 
 export default function LaunchpadClient() {
   // общий хук кошелька из NFT-модуля
-  const { signer, account } = useWallet();
+  const { signer, account, connect, disconnect, isConnected, isConnecting } =
+    useWallet();
 
   const [data, setData] = React.useState<LaunchpadState | null>(null);
   const [isOwner, setIsOwner] = React.useState(false);
@@ -296,11 +297,37 @@ export default function LaunchpadClient() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 text-gray-200">
       <div className="rounded-2xl bg-[#0F1115] border border-[#23262B] p-6 shadow-xl">
+        {/* header + connect button */}
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold">GAD Launchpad</h1>
-          <span className="text-xs opacity-60 break-all">
-            Contract: {LAUNCHPAD_ADDRESS}
-          </span>
+          <div>
+            <h1 className="text-2xl font-semibold">GAD Launchpad</h1>
+            <span className="text-xs opacity-60 break-all">
+              Contract: {LAUNCHPAD_ADDRESS}
+            </span>
+          </div>
+
+          <div className="flex flex-col items-end gap-1">
+            {account && (
+              <div className="text-xs opacity-70 break-all">{account}</div>
+            )}
+            {isConnected ? (
+              <button
+                onClick={() => disconnect()}
+                disabled={isConnecting}
+                className="px-4 py-2 rounded-xl bg-[#f97373] text-black font-semibold hover:bg-[#fb5c5c] transition disabled:opacity-40 text-sm"
+              >
+                Disconnect
+              </button>
+            ) : (
+              <button
+                onClick={() => connect()}
+                disabled={isConnecting}
+                className="px-4 py-2 rounded-xl bg-[#22c55e] text-black font-semibold hover:bg-[#4ade80] transition disabled:opacity-40 text-sm"
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* INFO CARDS */}
@@ -469,7 +496,7 @@ export default function LaunchpadClient() {
           <div>Pending owner: {d?.pendingOwner ?? '-'}</div>
           {!account && (
             <div className="text-amber-400">
-              Connect your wallet in the header to participate in the launchpad.
+              Connect your wallet above to participate in the launchpad.
             </div>
           )}
         </div>
