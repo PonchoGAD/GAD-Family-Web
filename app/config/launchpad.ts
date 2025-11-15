@@ -1,5 +1,5 @@
 export const CHAIN_ID = 56; // BNB Smart Chain Mainnet
-export const LAUNCHPAD_ADDRESS = '0x528e90A8304dCd05B351F1291eA34d7d74E4A08d';
+export const LAUNCHPAD_ADDRESS = '0x0407b2E9c6aC53c8bf39b0194f87AD89f7e3Aa7E';
 export const USDT_ADDRESS      = '0x55d398326f99059fF775485246999027B3197955';
 
 export const ADDR = {
