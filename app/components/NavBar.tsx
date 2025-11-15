@@ -6,7 +6,10 @@ export default function NavBar() {
     <header className="w-full border-b border-white/10 backdrop-blur-md bg-[#0b0f17]/60">
       <nav className="mx-auto flex max-w-6xl items-center justify-between p-4">
         {/* Logo */}
-        <Link href="/" className="font-bold text-2xl tracking-wide text-[#ffd166] hover:opacity-90">
+        <Link
+          href="/"
+          className="font-bold text-2xl tracking-wide text-[#ffd166] hover:opacity-90"
+        >
           GAD
         </Link>
 
@@ -66,6 +69,14 @@ export default function NavBar() {
             className="px-4 py-2 rounded-xl bg-[#ffd166] text-[#0b0f17] font-semibold hover:bg-[#e6bf59] transition"
           >
             Proof
+          </Link>
+
+          {/* Launchpad */}
+          <Link
+            href="/launchpad"
+            className="px-4 py-2 rounded-xl bg-[#ff4b4b] text-black font-bold hover:bg-[#e03b3b] transition"
+          >
+            Launchpad
           </Link>
         </div>
       </nav>
