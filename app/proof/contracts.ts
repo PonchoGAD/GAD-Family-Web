@@ -124,7 +124,7 @@ export const CONTRACTS: ContractItem[] = [
   },
   {
     name: "LaunchpadSale",
-    address: "0x6501FCD154B9276b0821c0127B43e8A4412566Df",
+    address: "0xcf9f7ce8243eD3e402307f2f07BA950a6CB566EF",
     purpose: "Launchpad contract for public sales and allocations.",
     bscscanPath: "address",
     status: "Live",
