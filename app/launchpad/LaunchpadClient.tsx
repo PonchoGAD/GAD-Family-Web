@@ -259,7 +259,7 @@ export default function LaunchpadClient() {
       setLoading(true);
       const signer = await provider.getSigner();
       const usdt = new Contract(USDT_ADDRESS, erc20Abi, signer);
-      const amt = BigInt(Math.round(Number(amountUsdt) * 1e6)); // USDT 6 decimals
+      const amt = BigInt(Math.round(Number(amountUsdt) * 1e18)); // USDT 18 decimals
 
       const allowance: bigint = await usdt.allowance(account, LAUNCHPAD_ADDRESS);
       if (allowance < amt) {
@@ -445,7 +445,7 @@ export default function LaunchpadClient() {
           <Card
             title="Caps & Limits"
             items={[
-              ['Hard Cap (USD, 1e6)', d ? String(d.hardCapUsd) : '-'],
+              ['Hard Cap (USD, 1e18)', d ? String(d.hardCapUsd) : '-'],
               [
                 'Min BNB',
                 d && d.minBnbWei !== ZERO
@@ -460,11 +460,11 @@ export default function LaunchpadClient() {
               ],
               [
                 'Min USDT',
-                d && d.minUsdt !== ZERO ? `${Number(d.minUsdt) / 1e6} USDT` : '-',
+                d && d.minUsdt !== ZERO ? `${Number(d.minUsdt) / 1e18} USDT` : '-',
               ],
               [
                 'Max USDT',
-                d && d.maxUsdt !== ZERO ? `${Number(d.maxUsdt) / 1e6} USDT` : '-',
+                d && d.maxUsdt !== ZERO ? `${Number(d.maxUsdt) / 1e18} USDT` : '-',
               ],
             ]}
           />
@@ -536,7 +536,7 @@ export default function LaunchpadClient() {
             </div>
             <p className="mt-3 text-sm opacity-70">
               Your USDT:{' '}
-              {d && d.myUsdt !== ZERO ? `${Number(d.myUsdt) / 1e6} USDT` : '0'}
+              {d && d.myUsdt !== ZERO ? `${Number(d.myUsdt) / 1e18} USDT` : '0'}
             </p>
           </div>
         </div>
