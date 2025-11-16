@@ -222,6 +222,8 @@ export default function LaunchpadClient() {
   // =========================
   // Actions
   // =========================
+
+  // BNB
   async function buyBNB() {
     if (!provider || !account) {
       alert('Connect wallet first');
@@ -231,7 +233,8 @@ export default function LaunchpadClient() {
     try {
       setLoading(true);
       await withSigner(async (c) => {
-        const tx = await c.buyWithBNB({ value: parseEther(amountBnb) });
+        // ВАЖНО: вызываем contributeBNB, как в контракте
+        const tx = await c.contributeBNB({ value: parseEther(amountBnb) });
         await tx.wait();
         return;
       });
@@ -245,6 +248,7 @@ export default function LaunchpadClient() {
     }
   }
 
+  // USDT
   async function buyUSDT() {
     if (!provider || !account) {
       alert('Connect wallet first');
@@ -264,7 +268,8 @@ export default function LaunchpadClient() {
       }
 
       const c = new Contract(LAUNCHPAD_ADDRESS, launchpadAbi, signer);
-      const tx2 = await c.buyWithUSDT(amt);
+      // ВАЖНО: вызываем contributeUSDT, как в контракте
+      const tx2 = await c.contributeUSDT(amt);
       await tx2.wait();
 
       await refresh();
@@ -309,8 +314,9 @@ export default function LaunchpadClient() {
 
     try {
       setLoading(true);
-      const bnbUsd = 933660000n; // $933.66 * 1e6
-      const gadPerUsd = 100000000n; // 100 000 GAD
+      // текущие значения, которые ты уже использовал в Safe
+      const bnbUsd = 942700000n; // $942.70 * 1e6
+      const gadPerUsd = 100000000000000000000000n; // 100 000 GAD * 1e18
       await withSigner(async (c) => {
         const tx = await c.setStartRates(bnbUsd, gadPerUsd);
         await tx.wait();
