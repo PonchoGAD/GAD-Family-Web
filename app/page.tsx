@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { ReactElement } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -284,6 +284,8 @@ function statusColor(status: EcosystemStatus): string {
 // ============================
 
 export default function Page(): ReactElement {
+  const [activeNode, setActiveNode] = useState<string | null>(null);
+
   return (
     <div className="min-h-screen bg-[#050711] text-white">
       {/* фоновые свечения */}
@@ -295,12 +297,27 @@ export default function Page(): ReactElement {
 
       <Header />
       <main>
-        <Hero />
-        <EcosystemSection />
+        <Hero activeNode={activeNode} />
+        <SectionDivider />
+
+        <EcosystemSection setActiveNode={setActiveNode} />
+        <SectionDivider />
+
         <TokenUtilitySection />
+        <SectionDivider />
+
         <TokenDistributionSection />
+        <SectionDivider />
+
         <ProofSection />
+        <SectionDivider />
+
         <LaunchpadSection />
+        <SectionDivider />
+
+        <RiskDisclosureSection />
+        <SectionDivider />
+
         <RoadmapSection />
         <CommunitySection />
       </main>
@@ -308,6 +325,11 @@ export default function Page(): ReactElement {
     </div>
   );
 }
+
+function SectionDivider(): ReactElement {
+  return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />;
+}
+
 
 // ============================
 // Header
@@ -317,6 +339,7 @@ function Header(): ReactElement {
   return (
     <header className="sticky top-0 z-40 border-b border-white/5 bg-black/40 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+
         {/* Logo + brand */}
         <Link href="/" className="flex items-center gap-3">
           <div className="relative h-9 w-9 overflow-hidden rounded-full border border-white/10 bg-black/60">
@@ -331,44 +354,48 @@ function Header(): ReactElement {
           </div>
           <div className="flex flex-col leading-tight">
             <span className="text-sm font-semibold text-white/80">{BRAND.name}</span>
-            <span className="text-[11px] uppercase tracking-[0.18em] text-white/40">Family Web3</span>
+            <span className="text-[11px] uppercase tracking-[0.18em] text-white/40">
+              Family Web3
+            </span>
           </div>
         </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-5 text-xs font-medium text-white/70 md:flex">
-          <a href="#ecosystem" className="hover:text-white">
-            Ecosystem
-          </a>
-          <a href="#token" className="hover:text-white">
-            Token
-          </a>
-          <a href="#launchpad" className="hover:text-white">
-            Launchpad
-          </a>
-          <a href="#nft" className="hover:text-white">
-            NFT
-          </a>
-          <a href="#wallet" className="hover:text-white">
-            Wallet
-          </a>
-          <a href="#proof" className="hover:text-white">
-            Proof
-          </a>
-          <a href="#dao" className="hover:text-white">
-            DAO
-          </a>
+          <a href="#ecosystem" className="hover:text-white">Ecosystem</a>
+          <a href="#token" className="hover:text-white">Token</a>
+          <a href="#launchpad" className="hover:text-white">Launchpad</a>
+          <a href="#nft" className="hover:text-white">NFT</a>
+          <a href="#wallet" className="hover:text-white">Wallet</a>
+          <a href="#proof" className="hover:text-white">Proof</a>
+          <a href="#dao" className="hover:text-white">DAO</a>
+
+          {/* subtle divider */}
+          <span className="mx-1 h-3 w-px bg-white/15" />
+
+          {/* Investor micro-links */}
+          <Link href="/investors" className="text-white/60 hover:text-white">
+            Investors
+          </Link>
+          <Link href="/pitch" className="text-white/60 hover:text-white">
+            Pitch
+          </Link>
         </nav>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <span className="hidden rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300 md:inline">
+            Preparing for IDO
+          </span>
+
           <Link
             href={LINKS.airdrop}
-            className="hidden rounded-xl bg-[#ffd166] px-3 py-2 text-xs font-semibold text-[#050711] shadow-md shadow-yellow-500/30 hover:scale-[1.02] hover:bg-[#f4c457] md:inline-flex"
+            className="hidden rounded-xl bg-[#ffd166] px-3 py-2 text-xs font-semibold text-[#050711] shadow-md shadow-yellow-500/30 hover:bg-[#f4c457] md:inline-flex"
           >
             <Sparkles className="mr-1 h-4 w-4" />
-            Claim Airdrop
+            Airdrop
           </Link>
+
           <Link
             href={LINKS.launchpad}
             className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white/90 hover:border-white/40 hover:bg-white/10"
@@ -377,6 +404,7 @@ function Header(): ReactElement {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
+
       </div>
     </header>
   );
@@ -386,17 +414,20 @@ function Header(): ReactElement {
 // Hero
 // ============================
 
-function Hero(): ReactElement {
+function Hero({ activeNode }: { activeNode: string | null }): ReactElement {
   return (
     <section id="hero" className="relative border-b border-white/10">
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-12 md:flex-row md:items-center md:py-16">
-        {/* Left / text */}
+        
+        {/* ================= LEFT / TEXT ================= */}
         <div className="relative z-10 flex-1 space-y-6">
+          {/* Badge */}
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-emerald-200">
             <Globe2 className="h-3.5 w-3.5" />
             Family-centric Web3 ecosystem
           </div>
 
+          {/* Headline */}
           <div>
             <h1 className="text-balance text-3xl font-extrabold leading-tight md:text-5xl">
               Money. Safety. Ownership.
@@ -408,6 +439,9 @@ function Hero(): ReactElement {
               GAD connects a family app, wallet, launchpad, NFT marketplace, and DAO into a single, transparent digital
               universe. Built around real-world families, not speculation.
             </p>
+            <p className="max-w-xl text-[12px] text-white/50">
+  Designed for long-term adoption, on-chain transparency, and real utility — not short-term hype.
+</p>
           </div>
 
           {/* CTAs */}
@@ -420,6 +454,7 @@ function Hero(): ReactElement {
               Open Launchpad
               <ArrowRight className="h-4 w-4" />
             </Link>
+
             <Link
               href={LINKS.proof}
               className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/5 px-5 py-3 text-sm font-semibold text-white hover:border-white/45 hover:bg-white/10"
@@ -427,6 +462,7 @@ function Hero(): ReactElement {
               <Shield className="h-4 w-4" />
               Proof of Contracts
             </Link>
+
             <a
               href={LINKS.pancakeSwapBuy}
               target="_blank"
@@ -438,10 +474,30 @@ function Hero(): ReactElement {
             </a>
           </div>
 
-          {/* Token info */}
+          {/* INVESTOR AWARENESS LAYER */}
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/55">
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+              Preparing for IDO
+            </span>
+            <Link href="/investors" className="underline underline-offset-2 hover:text-white">
+              Investors Hub
+            </Link>
+            <Link href="/pitch" className="underline underline-offset-2 hover:text-white">
+              Pitch Deck
+            </Link>
+          </div>
+
+          {/* TRUST SIGNALS */}
+          <div className="text-[11px] text-white/45">
+            Contracts deployed • Treasury via Safe multisig • Audit in progress
+          </div>
+
+          {/* TOKEN INFO (оставляем как было) */}
           <div className="mt-4 grid gap-3 text-xs text-white/60 md:grid-cols-[minmax(0,2fr),minmax(0,1.4fr)]">
             <div className="rounded-xl border border-white/10 bg-black/40 p-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">Token Contract (BSC)</div>
+              <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">
+                Token Contract (BSC)
+              </div>
               <div className="mt-1 font-mono text-[11px] text-white/80 break-all">
                 {ADDR.token}
               </div>
@@ -455,10 +511,11 @@ function Hero(): ReactElement {
                 View on BscScan
               </a>
             </div>
+
             <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-1">
               <div className="flex items-center justify-between text-[11px] text-white/50">
                 <span>Chain</span>
-                <span className="font-medium text-white/80">BNB Smart Chain (BSC)</span>
+                <span className="font-medium text-white/80">BNB Smart Chain</span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-white/50">
                 <span>Total supply</span>
@@ -472,9 +529,10 @@ function Hero(): ReactElement {
           </div>
         </div>
 
-        {/* Right / visual */}
+        {/* ================= RIGHT / LIVING MAP ================= */}
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-6 rounded-[2rem] border border-white/5 bg-gradient-to-br from-white/4 via-black/60 to-black/90 shadow-[0_0_120px_rgba(0,0,0,0.9)]" />
+
           <div className="relative z-10 overflow-hidden rounded-[2rem] border border-white/10 bg-black/70 p-5">
             <div className="flex items-center justify-between text-xs text-white/60">
               <span className="inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.18em] text-white/40">
@@ -482,34 +540,34 @@ function Hero(): ReactElement {
                 GAD Universe Map
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-white/60">
-                Conceptual visual
+                Live ecosystem
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-[1.3fr,1fr] gap-4 md:grid-cols-[1.3fr,1fr]">
-              {/* "Карта" */}
+            <div className="mt-4 grid grid-cols-[1.3fr,1fr] gap-4">
+              {/* CORE MAP */}
               <div className="relative h-56 rounded-2xl border border-white/10 bg-gradient-to-br from-[#111827] via-[#020617] to-black p-4">
                 <div className="absolute inset-0 opacity-60">
                   <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#ffd166]/10 blur-2xl" />
                   <div className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#ffd166]/40" />
                 </div>
+
                 <div className="relative flex h-full flex-col items-center justify-center gap-4">
                   <div className="rounded-full border border-[#ffd166]/70 bg-black/80 px-4 py-2 text-center">
                     <div className="text-[11px] uppercase tracking-[0.2em] text-[#ffd166]/80">Core</div>
                     <div className="text-sm font-semibold text-white">GAD Token</div>
                   </div>
+
+                  {/* LIVING NODES */}
                   <div className="grid grid-cols-3 gap-3 text-[11px] text-white/70">
-                    <HeroNode label="Wallet" />
-                    <HeroNode label="App" />
-                    <HeroNode label="Launchpad" />
-                    <HeroNode label="NFT" />
-                    <HeroNode label="DAO" />
-                    <HeroNode label="Locks" />
+                    {['Wallet', 'App', 'Launchpad', 'NFT', 'DAO', 'Locks'].map((n) => (
+                      <HeroNode key={n} label={n} active={activeNode === n} />
+                    ))}
                   </div>
                 </div>
               </div>
 
-              {/* Мини-инфо по экосистеме */}
+              {/* MINI INFO */}
               <div className="flex flex-col justify-between gap-4 rounded-2xl border border-white/10 bg-black/60 p-4">
                 <div className="space-y-2 text-xs text-white/70">
                   <div className="flex items-center gap-2">
@@ -525,8 +583,9 @@ function Hero(): ReactElement {
                     <span>DAO and NFT layers built gradually on top of utility.</span>
                   </div>
                 </div>
+
                 <div className="flex items-center justify-between text-[11px] text-white/50">
-                  <span>Everything connects back to GAD and real families.</span>
+                  <span>Everything connects back to GAD.</span>
                   <Link
                     href="#ecosystem"
                     className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-1 text-[10px] text-white/70 hover:border-white/40"
@@ -539,102 +598,167 @@ function Hero(): ReactElement {
             </div>
           </div>
         </div>
+
       </div>
     </section>
   );
 }
 
-function HeroNode({ label }: { label: string }): ReactElement {
+
+function HeroNode({
+  label,
+  active,
+}: {
+  label: string;
+  active?: boolean;
+}): ReactElement {
   return (
-    <div className="relative rounded-xl border border-white/10 bg-black/70 px-2 py-1.5 text-center">
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/5 via-transparent to-transparent opacity-40" />
-      <span className="relative z-10 text-[11px] text-white/75">{label}</span>
+    <div
+      className={[
+        'relative rounded-xl px-2 py-1.5 text-center transition-all duration-300',
+        active
+          ? 'border border-[#ffd166] bg-[#ffd166]/10 shadow-[0_0_18px_#ffd16666]'
+          : 'border border-white/10 bg-black/70',
+      ].join(' ')}
+    >
+      {active && (
+        <span className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-[#ffd166]/20 via-transparent to-transparent" />
+      )}
+      <span className="relative z-10 text-[11px] text-white/80">{label}</span>
     </div>
   );
 }
+
+
 
 // ============================
 // Ecosystem Overview
 // ============================
 
-function EcosystemSection(): ReactElement {
+function EcosystemSection({
+  setActiveNode,
+}: {
+  setActiveNode: React.Dispatch<React.SetStateAction<string | null>>;
+}): ReactElement {
+  // связываем экосистемные id с узлами на карте Hero (подсветка)
+  const nodeById: Record<string, string> = {
+    wallet: 'Wallet',
+    app: 'App',
+    launchpad: 'Launchpad',
+    nft: 'NFT',
+    dao: 'DAO',
+    chain: 'Locks', // Chain (R&D) логично подсвечивать как “Locks/Infra” на карте
+  };
+
   return (
     <section id="ecosystem" className="border-b border-white/10 py-12 md:py-14">
       <div className="mx-auto max-w-6xl px-4">
-        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-extrabold md:text-3xl">Ecosystem Overview</h2>
-            <p className="mt-1 max-w-xl text-sm text-white/70">
-              GAD is not just a token. It is a coordinated set of modules designed for families: wallet, app, launchpad,
-              NFT, DAO, and future chain research.
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-white/60">
+              <Layers className="h-3.5 w-3.5 text-[#ffd166]" />
+              Living Ecosystem Map
+            </div>
+
+            <h2 className="mt-3 text-2xl font-extrabold md:text-3xl">Ecosystem Overview</h2>
+            <p className="mt-2 max-w-xl text-sm text-white/70">
+              A family-first product suite where each module reinforces the others. Hover a tile to highlight it in the
+              Universe Map above — no gimmicks, just structure.
             </p>
           </div>
-          <p className="text-xs text-white/50">
-            Each tile below is a building block. Some are live, others in active development or research.
-          </p>
+
+          <div className="rounded-2xl border border-white/10 bg-black/40 p-4 text-xs text-white/70 md:max-w-sm">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/45">
+              <Shield className="h-4 w-4 text-emerald-300" />
+              Investor lens
+            </div>
+            <p className="mt-2">
+              We separate <span className="text-white/90">Live</span>, <span className="text-white/90">In Progress</span>
+              , and <span className="text-white/90">R&amp;D</span> to make risk and delivery transparent.
+            </p>
+          </div>
         </header>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {ECOSYSTEM.map((item) => (
-            <article
-              key={item.id}
-              id={
-                item.id === 'wallet'
-                  ? 'wallet'
-                  : item.id === 'launchpad'
-                  ? 'launchpad'
-                  : item.id === 'nft'
-                  ? 'nft'
-                  : undefined
-              }
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-black/60 p-4 transition hover:border-[#ffd166]/60 hover:bg-black/80"
-            >
-              <div className="pointer-events-none absolute -top-10 right-0 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-[#ffd166]/15" />
-              <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/15 bg-black/60">
-                    {item.icon}
+          {ECOSYSTEM.map((item) => {
+            const nodeLabel = nodeById[item.id] ?? null;
+
+            return (
+              <article
+                key={item.id}
+                id={item.id === 'wallet' ? 'wallet' : item.id === 'launchpad' ? 'launchpad' : item.id === 'nft' ? 'nft' : undefined}
+                onMouseEnter={() => nodeLabel && setActiveNode(nodeLabel)}
+                onMouseLeave={() => setActiveNode(null)}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-black/60 p-5 transition hover:border-[#ffd166]/60 hover:bg-black/80"
+              >
+                {/* subtle glow */}
+                <div className="pointer-events-none absolute -top-10 right-0 h-32 w-32 rounded-full bg-emerald-500/10 blur-2xl transition group-hover:bg-[#ffd166]/15" />
+
+                <div className="relative z-10 flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-2xl border border-white/15 bg-black/60">
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">{item.name}</h3>
+                      <p className="mt-0.5 text-[11px] text-white/60">{item.tagline}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">{item.name}</h3>
-                    <p className="text-[11px] text-white/60">{item.tagline}</p>
-                  </div>
-                </div>
-                <div
-                  className={[
-                    'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                    statusColor(item.status),
-                  ].join(' ')}
-                >
-                  {statusLabel(item.status)}
-                </div>
-              </div>
-              <p className="relative z-10 mt-3 text-xs text-white/70">{item.description}</p>
-              <div className="relative z-10 mt-4 flex items-center justify-between text-[11px] text-white/50">
-                <span>
-                  {item.status === 'live'
-                    ? 'Available via web dApps.'
-                    : item.status === 'in-progress'
-                    ? 'Actively being built.'
-                    : 'Concept and research stage.'}
-                </span>
-                {item.href && (
-                  <Link
-                    href={item.href}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/15 px-2 py-0.5 text-[10px] text-white/70 hover:border-white/40"
+
+                  <div
+                    className={[
+                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                      statusColor(item.status),
+                    ].join(' ')}
                   >
-                    Open
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
-                )}
-              </div>
-            </article>
-          ))}
+                    {statusLabel(item.status)}
+                  </div>
+                </div>
+
+                <p className="relative z-10 mt-3 text-xs text-white/70">{item.description}</p>
+
+                {/* micro “investor-friendly” line */}
+                <div className="relative z-10 mt-4 rounded-xl border border-white/10 bg-black/40 p-3 text-[11px] text-white/60">
+                  {item.status === 'live' ? (
+                    <span>
+                      Ready to explore now — connected to the on-chain core.
+                    </span>
+                  ) : item.status === 'in-progress' ? (
+                    <span>
+                      In active build — milestones are tracked and integrated with the core.
+                    </span>
+                  ) : (
+                    <span>
+                      R&amp;D track — design and prototypes, no false promises.
+                    </span>
+                  )}
+                </div>
+
+                <div className="relative z-10 mt-4 flex items-center justify-between text-[11px] text-white/50">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/30" />
+                    Hover = highlights the map
+                  </span>
+
+                  {item.href && (
+                    <Link
+                      href={item.href}
+                      className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70 hover:border-white/40"
+                    >
+                      Open
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
+
 
 // ============================
 // Token Utility
@@ -642,40 +766,44 @@ function EcosystemSection(): ReactElement {
 
 function TokenUtilitySection(): ReactElement {
   return (
-    <section id="token" className="border-b border-white/10 bg-black/40 py-12 md:py-14">
+    <section id="token" className="border-b border-white/10 bg-black/40 py-12 md:py-16">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-[1.4fr,1fr] md:items-center">
+
+        {/* LEFT — utility narrative */}
         <div>
-          <h2 className="text-2xl font-extrabold md:text-3xl">GAD Token Utility</h2>
+          <h2 className="text-2xl font-extrabold md:text-3xl">
+            GAD Token Utility
+          </h2>
           <p className="mt-2 max-w-xl text-sm text-white/70">
-            GAD is the core asset of the ecosystem. It is used across the family app, wallet, DAO, NFT marketplace, and
-            long-term value flows connected to real behaviour.
+            GAD is not a single-purpose reward token. It is a routing asset that connects
+            real user behaviour, on-chain governance, and long-term ecosystem value.
           </p>
 
-          <div className="mt-5 space-y-3 text-sm text-white/75">
+          <div className="mt-5 space-y-4 text-sm text-white/75">
             <UtilityItem
-              title="In-app rewards & family goals"
-              text="Daily steps, quests, and shared family challenges convert into GAD rewards, with multipliers for premium plans."
+              title="In-app rewards & family behaviour"
+              text="Daily steps, family challenges, location-based activity, and real habits are translated into GAD through transparent scoring logic."
             />
             <UtilityItem
               title="Governance & xGAD"
-              text="Staking GAD into xGAD unlocks governance rights over treasury, parameters, rewards, and future expansions."
+              text="Staking GAD into xGAD grants voting power over treasury usage, incentives, burns, and ecosystem parameters."
             />
             <UtilityItem
-              title="Staking, farming & LP"
-              text="GAD underpins liquidity pools, farming programs, and long-term holder incentives around real utility."
+              title="Liquidity, staking & long-term holding"
+              text="GAD supports LP positions, farming programs, and staking mechanics designed to reward long-term alignment."
             />
             <UtilityItem
-              title="NFT economy & digital items"
-              text="NFT badges, collections, and future toy-linked drops use GAD as a core currency and value gateway."
+              title="NFT economy & digital ownership"
+              text="NFT badges, collections, and future physical-linked assets use GAD as a settlement and access layer."
             />
             <UtilityItem
-              title="Subscriptions & premium features"
-              text="Future premium features in the app and wallet tie back to GAD, including step multipliers and family-level perks."
+              title="Premium features & subscriptions"
+              text="Advanced app features, multipliers, and family-level upgrades are designed to create recurring GAD demand."
             />
           </div>
         </div>
 
-        {/* Simple flow card */}
+        {/* RIGHT — value flow */}
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#020617] via-black to-[#0f172a] p-4">
           <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[#ffd166]/10 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-10 left-0 h-40 w-40 rounded-full bg-emerald-500/15 blur-3xl" />
@@ -686,17 +814,34 @@ function TokenUtilitySection(): ReactElement {
               Value flow snapshot
             </div>
 
-            <FlowRow label="Families" value="Steps, locations, goals, real-world behaviour" />
-            <FlowRow label="App & Wallet" value="Track, score, and route activity into rewards" />
-            <FlowRow label="GAD Token" value="Minted & used according to rules, not promises" />
-            <FlowRow label="DAO & Treasury" value="Decide how to route value, grants, and buybacks" />
-            <FlowRow label="Back to Families" value="Upgrades, perks, and new features for real users" />
+            <FlowRow
+              label="Families & real users"
+              value="Steps, movement, goals, real-world engagement"
+            />
+            <FlowRow
+              label="App & Wallet layer"
+              value="Tracking, scoring, permissions, and reward routing"
+            />
+            <FlowRow
+              label="GAD Token"
+              value="Minted, distributed, staked, and governed by on-chain rules"
+            />
+            <FlowRow
+              label="DAO & Treasury"
+              value="Decisions on incentives, grants, buybacks, and ecosystem growth"
+            />
+            <FlowRow
+              label="Back to users"
+              value="New features, upgrades, rewards, and long-term value alignment"
+            />
           </div>
         </div>
+
       </div>
     </section>
   );
 }
+
 
 function UtilityItem({ title, text }: { title: string; text: string }): ReactElement {
   return (
@@ -705,24 +850,34 @@ function UtilityItem({ title, text }: { title: string; text: string }): ReactEle
         <CheckCircle2 className="h-3 w-3 text-[#ffd166]" />
       </div>
       <div>
-        <div className="text-[13px] font-semibold text-white">{title}</div>
-        <p className="text-[13px] text-white/70">{text}</p>
+        <div className="text-[13px] font-semibold text-white">
+          {title}
+        </div>
+        <p className="text-[13px] text-white/70">
+          {text}
+        </p>
       </div>
     </div>
   );
 }
 
+
 function FlowRow({ label, value }: { label: string; value: string }): ReactElement {
   return (
     <div className="rounded-xl border border-white/10 bg-black/40 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold text-white/70">{label}</span>
+        <span className="text-[11px] font-semibold text-white/75">
+          {label}
+        </span>
         <span className="text-[10px] text-white/40">→</span>
       </div>
-      <p className="mt-1 text-[11px] text-white/65">{value}</p>
+      <p className="mt-1 text-[11px] text-white/65">
+        {value}
+      </p>
     </div>
   );
 }
+
 
 // ============================
 // Token Distribution
@@ -732,14 +887,19 @@ function TokenDistributionSection(): ReactElement {
   const total = TOKEN_DISTRIBUTION.reduce((acc, item) => acc + item.value, 0);
 
   return (
-    <section className="border-b border-white/10 py-12 md:py-14">
+    <section className="border-b border-white/10 py-12 md:py-16">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 md:grid-cols-[1.3fr,1fr] md:items-start">
+
+        {/* LEFT */}
         <div>
-          <h2 className="text-2xl font-extrabold md:text-3xl">Token Distribution</h2>
+          <h2 className="text-2xl font-extrabold md:text-3xl">
+            Token Distribution
+          </h2>
           <p className="mt-2 max-w-xl text-sm text-white/70">
-            High-level allocation of the 10T fixed supply. Exact percentages and mechanics are reflected on-chain via
-            locks, vesting contracts, and the treasury Safe.
+            GAD has a fixed supply of 10 trillion tokens. Distribution is designed
+            to balance early participation, long-term ecosystem growth, and controlled emissions.
           </p>
+
           <div className="mt-4 space-y-2 text-sm">
             {TOKEN_DISTRIBUTION.map((item) => (
               <div
@@ -749,38 +909,58 @@ function TokenDistributionSection(): ReactElement {
                 <div className="flex items-center gap-2">
                   <div className="h-2 w-6 rounded-full bg-gradient-to-r from-[#ffd166] to-emerald-400 opacity-80" />
                   <div className="flex flex-col">
-                    <span className="text-[13px] font-medium text-white">{item.name}</span>
-                    {item.hint && <span className="text-[11px] text-white/55">{item.hint}</span>}
+                    <span className="text-[13px] font-medium text-white">
+                      {item.name}
+                    </span>
+                    {item.hint && (
+                      <span className="text-[11px] text-white/55">
+                        {item.hint}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <span className="text-sm font-semibold text-[#ffd166]">{item.value}%</span>
+                <span className="text-sm font-semibold text-[#ffd166]">
+                  {item.value}%
+                </span>
               </div>
             ))}
           </div>
+
           <p className="mt-3 text-[11px] text-white/50">
-            Total: {total}% • Total supply: <span className="font-mono text-white/70">10,000,000,000,000 GAD</span> •
-            Burn: open for everyone via standard functions.
+            Total: {total}% • Fixed supply:{" "}
+            <span className="font-mono text-white/70">
+              10,000,000,000,000 GAD
+            </span>
+            <br />
+            Burn mechanics are open and verifiable via standard on-chain functions.
           </p>
         </div>
 
-        {/* Simple "locks" card */}
+        {/* RIGHT — locks */}
         <div className="space-y-4">
           <div className="rounded-2xl border border-white/10 bg-black/70 p-4 text-xs text-white/70">
             <div className="flex items-center gap-2">
               <Lock className="h-4 w-4 text-emerald-300" />
-              <span className="text-[11px] uppercase tracking-[0.16em] text-white/50">Locks & vesting</span>
+              <span className="text-[11px] uppercase tracking-[0.16em] text-white/50">
+                Locks & vesting
+              </span>
             </div>
+
             <ul className="mt-3 space-y-2">
               <li>
-                Long-term allocations are locked for 36 months with unlocks every 6 months. 10% of each unlocked tranche
-                is targeted for burns; the remaining share supports app incentives and operations.
+                Ecosystem allocations are locked for 36 months with scheduled
+                unlocks every 6 months. A portion of each unlock is reserved for burns.
               </li>
               <li>
-                Early investor and team allocations are managed by the Vesting Vault contract, with transparent TGE and
-                cliff logic enforced on-chain.
+                Team and early investor allocations are governed by the Vesting Vault
+                contract with enforced cliffs and release schedules.
               </li>
-              <li>Liquidity positions are locked via the LP locker, keeping core LP secure for the community.</li>
+              <li>
+                Liquidity positions are protected via the LP Token Locker to
+                reduce market risk and ensure long-term stability.
+              </li>
             </ul>
+
             <Link
               href="#proof"
               className="mt-3 inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1 text-[11px] text-white/70 hover:border-white/40"
@@ -790,10 +970,12 @@ function TokenDistributionSection(): ReactElement {
             </Link>
           </div>
         </div>
+
       </div>
     </section>
   );
 }
+
 
 // ============================
 // Proof / Transparency
@@ -801,16 +983,21 @@ function TokenDistributionSection(): ReactElement {
 
 function ProofSection(): ReactElement {
   return (
-    <section id="proof" className="border-b border-white/10 bg-black/40 py-12 md:py-14">
+    <section id="proof" className="border-b border-white/10 bg-black/40 py-12 md:py-16">
       <div className="mx-auto max-w-6xl px-4">
+
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-extrabold md:text-3xl">Proof & Transparency</h2>
+            <h2 className="text-2xl font-extrabold md:text-3xl">
+              Proof & Transparency
+            </h2>
             <p className="mt-1 max-w-xl text-sm text-white/70">
-              Critical contracts are deployed, verified, and tied into a Safe multisig treasury. The goal is simple: no
-              hidden logic, no surprise mints, no invisible owner actions.
+              All critical components of the GAD ecosystem are deployed on-chain,
+              publicly verifiable, and connected to a Safe multisig treasury.
+              No hidden owner privileges. No off-chain control.
             </p>
           </div>
+
           <Link
             href={LINKS.proof}
             className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white/85 hover:border-white/40 hover:bg-white/10"
@@ -825,21 +1012,35 @@ function ProofSection(): ReactElement {
             <ContractCard key={c.label} contract={c} />
           ))}
         </div>
+
+        {/* trust footer */}
+        <div className="mt-6 text-center text-[11px] text-white/45">
+          Transparency is a default state — not a marketing feature.
+        </div>
+
       </div>
     </section>
   );
 }
 
+
 function ContractCard({ contract }: { contract: ProofContract }): ReactElement {
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-white/10 bg-black/70 p-4 text-xs text-white/70">
-      <div className="flex items-center justify-between gap-2">
+    <article className="relative flex h-full flex-col rounded-2xl border border-white/10 bg-black/70 p-4 text-xs text-white/70">
+
+      {/* glow */}
+      <div className="pointer-events-none absolute -top-6 right-0 h-20 w-20 rounded-full bg-emerald-500/10 blur-2xl" />
+
+      <div className="relative z-10 flex items-center justify-between gap-2">
         <div className="inline-flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-xl border border-white/15 bg-black/70">
             <Link2 className="h-4 w-4 text-[#ffd166]" />
           </div>
-          <h3 className="text-sm font-semibold text-white">{contract.label}</h3>
+          <h3 className="text-sm font-semibold text-white">
+            {contract.label}
+          </h3>
         </div>
+
         <a
           href={contract.href}
           target="_blank"
@@ -850,13 +1051,22 @@ function ContractCard({ contract }: { contract: ProofContract }): ReactElement {
           BscScan
         </a>
       </div>
-      <p className="mt-3 text-[11px]">{contract.description}</p>
-      <div className="mt-3 rounded-xl border border-white/10 bg-black/70 p-2 font-mono text-[10px] text-white/60 break-all">
+
+      <p className="relative z-10 mt-3 text-[11px]">
+        {contract.description}
+      </p>
+
+      <div className="relative z-10 mt-3 rounded-xl border border-white/10 bg-black/70 p-2 font-mono text-[10px] text-white/60 break-all">
         {contract.addr}
+      </div>
+
+      <div className="relative z-10 mt-auto pt-3 text-[10px] text-white/40">
+        Publicly verifiable • Immutable • On-chain enforced
       </div>
     </article>
   );
 }
+
 
 // ============================
 // Launchpad / Investors
@@ -948,24 +1158,99 @@ function LaunchpadFact({ title, value }: { title: string; value: string }): Reac
   );
 }
 
+
+function RiskDisclosureSection(): ReactElement {
+  return (
+    <section id="risk" className="border-b border-white/10 bg-black/30 py-12 md:py-14">
+      <div className="mx-auto max-w-6xl px-4">
+
+        <header className="max-w-3xl">
+          <h2 className="text-2xl font-extrabold md:text-3xl">
+            Risk Disclosure
+          </h2>
+          <p className="mt-2 text-sm text-white/70">
+            GAD is a long-term ecosystem project. We believe transparency includes
+            openly communicating both opportunities and risks.
+          </p>
+        </header>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+
+          {/* Product risk */}
+          <div className="rounded-2xl border border-white/10 bg-black/60 p-4 text-xs text-white/70">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              Product & execution
+            </div>
+            <p className="mt-2">
+              Some ecosystem components are still under active development.
+              Timelines may evolve as the product is tested with real families
+              and adjusted based on feedback.
+            </p>
+          </div>
+
+          {/* Market risk */}
+          <div className="rounded-2xl border border-white/10 bg-black/60 p-4 text-xs text-white/70">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              Market & adoption
+            </div>
+            <p className="mt-2">
+              Token value and adoption depend on real user growth, market
+              conditions, and broader Web3 dynamics that are outside the team’s
+              full control.
+            </p>
+          </div>
+
+          {/* Regulatory / governance */}
+          <div className="rounded-2xl border border-white/10 bg-black/60 p-4 text-xs text-white/70">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/50">
+              Governance & regulation
+            </div>
+            <p className="mt-2">
+              The regulatory environment for crypto and family-oriented digital
+              products continues to evolve. Governance mechanisms are designed
+              to adapt over time via DAO processes.
+            </p>
+          </div>
+
+        </div>
+
+        <p className="mt-4 max-w-3xl text-[11px] text-white/45">
+          Participation in the GAD ecosystem assumes an understanding of these risks.
+          The team’s focus is on mitigation through transparency, on-chain controls,
+          and long-term alignment with real users.
+        </p>
+
+      </div>
+    </section>
+  );
+}
+
+
+
+
 // ============================
 // Roadmap / Milestones
 // ============================
 
 function RoadmapSection(): ReactElement {
   return (
-    <section id="dao" className="border-b border-white/10 bg-black/40 py-12 md:py-14">
+    <section id="dao" className="border-b border-white/10 bg-black/40 py-12 md:py-16">
       <div className="mx-auto max-w-6xl px-4">
+
         <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-extrabold md:text-3xl">Progress & Roadmap</h2>
+            <h2 className="text-2xl font-extrabold md:text-3xl">
+              Progress & Roadmap
+            </h2>
             <p className="mt-1 max-w-xl text-sm text-white/70">
-              Instead of promises-only roadmaps, GAD is built around concrete deployed pieces, active work, and clearly
-              separated future plans.
+              GAD follows an execution-first roadmap. What is listed as “Live” is already deployed.
+              “In Progress” reflects active work. “Next” represents clearly scoped future phases.
             </p>
           </div>
-          <div className="text-xs text-white/50">
-            DAO logic evolves gradually: first contracts and treasury, then UI and community votes.
+
+          <div className="text-xs text-white/45 max-w-xs md:text-right">
+            DAO evolution is incremental: first contracts and treasury,
+            then interfaces and community voting.
           </div>
         </header>
 
@@ -973,13 +1258,19 @@ function RoadmapSection(): ReactElement {
           {MILESTONES.map((group) => (
             <article
               key={group.title}
-              className="flex h-full flex-col rounded-2xl border border-white/10 bg-black/70 p-4 text-xs text-white/70"
+              className="relative flex h-full flex-col rounded-2xl border border-white/10 bg-black/70 p-4 text-xs text-white/70"
             >
-              <div className="flex items-center gap-2">
+              {/* subtle glow */}
+              <div className="pointer-events-none absolute -top-8 right-0 h-24 w-24 rounded-full bg-[#ffd166]/10 blur-2xl" />
+
+              <div className="relative z-10 flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-[#ffd166]" />
-                <h3 className="text-sm font-semibold text-white">{group.title}</h3>
+                <h3 className="text-sm font-semibold text-white">
+                  {group.title}
+                </h3>
               </div>
-              <ul className="mt-3 space-y-2">
+
+              <ul className="relative z-10 mt-3 space-y-2">
                 {group.items.map((it) => (
                   <li key={it} className="flex items-start gap-2">
                     <div className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -987,9 +1278,17 @@ function RoadmapSection(): ReactElement {
                   </li>
                 ))}
               </ul>
+
+              {/* investor signal */}
+              <div className="relative z-10 mt-auto pt-4 text-[11px] text-white/40">
+                {group.title === 'Live' && 'Already deployed and verifiable on-chain.'}
+                {group.title === 'In Progress' && 'Actively being built and tested.'}
+                {group.title === 'Next' && 'Planned phases after current delivery.'}
+              </div>
             </article>
           ))}
         </div>
+
       </div>
     </section>
   );
@@ -1001,27 +1300,69 @@ function RoadmapSection(): ReactElement {
 
 function CommunitySection(): ReactElement {
   return (
-    <section id="community" className="py-10">
+    <section id="community" className="py-12">
       <div className="mx-auto max-w-6xl px-4">
-        <div className="grid gap-6 md:grid-cols-[1.3fr,1fr] md:items-center">
+        <div className="grid gap-8 md:grid-cols-[1.2fr,1fr] md:items-start">
+
+          {/* Community */}
           <div>
-            <h2 className="text-xl font-extrabold md:text-2xl">Community & Communication</h2>
+            <h2 className="text-xl font-extrabold md:text-2xl">
+              Community & Communication
+            </h2>
             <p className="mt-2 max-w-xl text-sm text-white/70">
-              GAD is being built in the open: from contract addresses to long-term plans. Community channels will
-              gradually reflect the true state of the ecosystem, not hype cycles.
+              GAD is built in the open — contracts, structure, and long-term direction.
+              Community channels reflect reality, not hype cycles.
+            </p>
+
+            <div className="mt-4 grid gap-3 text-xs text-white/75 md:grid-cols-2">
+              <CommunityLink label="X (Twitter)" href={LINKS.x} />
+              <CommunityLink label="Discord" href={LINKS.discord} />
+              <CommunityLink label="Docs & Litepaper" href={LINKS.docs} />
+              <CommunityLink label="Proof / Contracts" href={LINKS.proof} internal />
+            </div>
+          </div>
+
+          {/* Investors */}
+          <div className="rounded-2xl border border-white/10 bg-black/60 p-5 text-sm text-white/70">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-white/50">
+              <Shield className="h-4 w-4 text-emerald-300" />
+              Investors & Partners
+            </div>
+
+            <p className="mt-3">
+              If you represent a fund, launchpad, or strategic partnership —
+              all investor-facing materials are publicly available.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-3 text-xs">
+              <Link
+                href="/investors"
+                className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 hover:border-white/40"
+              >
+                Investor Hub
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+
+              <Link
+                href="/pitch"
+                className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 hover:border-white/40"
+              >
+                Pitch Deck
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            <p className="mt-3 text-[11px] text-white/45">
+              No private decks on request — transparency by default.
             </p>
           </div>
-          <div className="grid gap-3 text-xs text-white/75 md:grid-cols-2">
-            <CommunityLink label="X (Twitter)" href={LINKS.x} />
-            <CommunityLink label="Discord" href={LINKS.discord} />
-            <CommunityLink label="Docs & Litepaper" href={LINKS.docs} />
-            <CommunityLink label="Proof / Contracts" href={LINKS.proof} internal />
-          </div>
+
         </div>
       </div>
     </section>
   );
 }
+
 
 function CommunityLink({
   label,
@@ -1062,30 +1403,60 @@ function CommunityLink({
 
 function Footer(): ReactElement {
   return (
-    <footer className="border-t border-white/10 bg-black/70 py-6 text-xs text-white/60">
-      <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-4 md:flex-row md:items-center">
+    <footer className="border-t border-white/10 bg-black/70 py-8 text-xs text-white/60">
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 md:grid-cols-[1.2fr,1fr] md:items-center">
+
+        {/* Left */}
         <div>
-          © {new Date().getFullYear()} {BRAND.fullName}. Built for real families, not just charts.
+          <div>
+            © {new Date().getFullYear()} {BRAND.fullName}. Built for real families.
+          </div>
+          <div className="mt-2 text-[11px] text-white/45">
+            Contracts deployed • Treasury via Safe multisig • On-chain first
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+
+        {/* Right */}
+        <div className="flex flex-wrap items-center justify-start gap-4 md:justify-end">
+
+          <Link
+            href="/investors"
+            className="inline-flex items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-300 hover:border-emerald-400"
+          >
+            Investor Hub
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+
+          <Link
+            href="/pitch"
+            className="inline-flex items-center gap-1 rounded-xl border border-white/20 bg-white/5 px-4 py-2 hover:border-white/40"
+          >
+            Pitch Deck
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+
           <a
             href={LINKS.github}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-white/60 hover:text-white"
+            className="inline-flex items-center gap-1 hover:text-white"
           >
             <Github className="h-3.5 w-3.5" />
             GitHub
           </a>
+
           <span className="h-3 w-px bg-white/20" />
-          <Link href="/terms" className="hover:text-white">
-            Terms
-          </Link>
-          <Link href="/privacy" className="hover:text-white">
-            Privacy
-          </Link>
+
+          <Link href="/terms" className="hover:text-white">Terms</Link>
+          <Link href="/privacy" className="hover:text-white">Privacy</Link>
         </div>
+
       </div>
     </footer>
   );
 }
+
+
+/* ============================
+   DIVIDER
+============================ */
