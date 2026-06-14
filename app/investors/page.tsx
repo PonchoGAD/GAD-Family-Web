@@ -251,7 +251,7 @@ function SectionLabel({ num, text }: { num: string; text: string }) {
   return (
     <div className="mb-8 flex items-center gap-3">
       <div className="h-px w-6" style={{ background: B.slateMid }} />
-      <span style={{ color: B.gold }} className="text-[11px] font-semibold tracking-[0.14em] uppercase" style={{ fontFamily: 'Syne, sans-serif', color: B.slateMid }}>
+      <span style={{ fontFamily: 'Syne, sans-serif', color: B.slateMid }} className="text-[11px] font-semibold tracking-[0.14em] uppercase">
         <span style={{ color: B.gold }}>{num}</span> {text}
       </span>
     </div>
