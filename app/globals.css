@@ -1,4 +1,147 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
-/* твои любые глобальные стили ниже */
 html, body { margin: 0; padding: 0; }
+
+/* ─── GAD Corp fonts ─── */
+:root {
+  --font-display: 'Syne', sans-serif;
+  --gold:   #facc15;
+  --violet: #a78bfa;
+  --black:  #020617;
+  --obsidian: #0b1120;
+}
+
+/* ─── Orbital rotation ─── */
+@keyframes orbit-cw {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes orbit-ccw {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+@keyframes orbit-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Orbiting rings */
+.orbit-ring-1 { animation: orbit-cw  22s linear infinite; }
+.orbit-ring-2 { animation: orbit-ccw 16s linear infinite; }
+.orbit-ring-3 { animation: orbit-cw  32s linear infinite; }
+
+/* Counter-rotation so icons stay upright */
+.orbit-node-1 { animation: orbit-ccw 22s linear infinite; }
+.orbit-node-2 { animation: orbit-cw  16s linear infinite; }
+.orbit-node-3 { animation: orbit-ccw 32s linear infinite; }
+
+/* ─── Pulse glow ─── */
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(250,204,21,0.0), 0 0 32px rgba(250,204,21,0.15); }
+  50%       { box-shadow: 0 0 0 12px rgba(250,204,21,0.0), 0 0 56px rgba(250,204,21,0.35); }
+}
+@keyframes pulse-violet {
+  0%, 100% { box-shadow: 0 0 24px rgba(167,139,250,0.1); }
+  50%       { box-shadow: 0 0 48px rgba(167,139,250,0.3); }
+}
+@keyframes glow-dot {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.3); }
+}
+
+.pulse-gold   { animation: pulse-gold   3s ease-in-out infinite; }
+.pulse-violet { animation: pulse-violet 4s ease-in-out infinite; }
+
+/* ─── Float vertical ─── */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+.float-y { animation: float-y 6s ease-in-out infinite; }
+
+/* ─── Fade-in on scroll (used with JS IntersectionObserver) ─── */
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── Shimmer (skeleton / live badge) ─── */
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease infinite;
+}
+
+/* ─── Live dot blink ─── */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.live-dot { animation: blink 1.4s ease-in-out infinite; }
+
+/* ─── Step progress bar ─── */
+@keyframes bar-grow {
+  from { width: 0%; }
+  to   { width: var(--bar-w, 72%); }
+}
+.bar-animate { animation: bar-grow 1.2s ease-out forwards; }
+
+/* ─── Ticker scroll ─── */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.ticker-track { animation: ticker 30s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
+
+/* ─── Number counter flip ─── */
+@keyframes count-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-in { animation: count-in 0.5s ease forwards; }
+
+/* ─── Gradient text ─── */
+.grad-text {
+  background: linear-gradient(135deg, #facc15 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.grad-text-gold {
+  background: linear-gradient(90deg, #facc15 0%, #fde68a 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Card hover lift ─── */
+.card-hover {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(250,204,21,0.4) !important;
+  box-shadow: 0 8px 32px rgba(250,204,21,0.08);
+}
+
+/* ─── Glass card ─── */
+.glass {
+  background: rgba(11,17,32,0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #020617; }
+::-webkit-scrollbar-thumb { background: rgba(250,204,21,0.3); border-radius: 2px; }

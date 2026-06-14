@@ -1,5 +1,11 @@
 {
   "installCommand": "corepack enable && corepack prepare pnpm@10.19.0 --activate && pnpm i --frozen-lockfile",
   "buildCommand": "NEXT_DISABLE_ESLINT=1 pnpm -v && pnpm build",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/telegram/cron",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }
