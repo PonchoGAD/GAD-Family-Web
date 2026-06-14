@@ -12,8 +12,8 @@
     "node": ">=18.18 <21"
   },
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
+    "dev": "next dev --webpack --port 3000",
+    "build": "next build --webpack",
     "start": "next start -p 3000",
     "airdrop": "node scripts/generate-airdrop.mjs",
     "lint": "echo \"(no linter configured)\""
@@ -33,7 +33,7 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.542.0",
     "marked": "^14.1.4",
-    "next": "^15.5.0",
+    "next": "^16.2.9",
     "node-fetch": "^3.3.2",
     "openai": "^6.3.0",
     "react": "^18.3.1",

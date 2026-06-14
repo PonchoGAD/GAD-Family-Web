@@ -11,9 +11,6 @@ const nextConfig = {
   // Упростим обработку изображений
   images: { unoptimized: true },
 
-  // Не валить билд из-за ESLint на CI
-  eslint: { ignoreDuringBuilds: true },
-
   webpack: (config, { isServer }) => {
     // ── ✅ ВАЖНО: шимаем expo-secure-store на веб-реализацию
     config.resolve.alias["expo-secure-store"] = path.resolve(
